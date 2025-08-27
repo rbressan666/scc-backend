@@ -1,9 +1,10 @@
-// controllers/userController.js
+// controllers/userController.js (CORRIGIDO PARA COLUNAS DO SUPABASE)
 import bcrypt from 'bcrypt';
 import pool from '../config/database.js';
 
 export const getAllUsers = async (req, res) => {
   try {
+    // CORRIGIDO para usar nomes das colunas do Supabase
     const result = await pool.query(`
       SELECT 
         id, 
@@ -11,19 +12,29 @@ export const getAllUsers = async (req, res) => {
         email, 
         perfil, 
         ativo, 
-        created_at, 
-        updated_at, 
-        ultimo_login 
+        data_criacao, 
+        data_atualizacao
       FROM usuarios 
-      ORDER BY created_at DESC
+      ORDER BY data_criacao DESC
     `);
     
     console.log(`📋 Lista de usuários solicitada por admin ID: ${req.user.id}`);
     
+    // Normalizar nomes das colunas para resposta
+    const users = result.rows.map(user => ({
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      perfil: user.perfil,
+      ativo: user.ativo,
+      created_at: user.data_criacao,
+      updated_at: user.data_atualizacao
+    }));
+    
     res.json({
       success: true,
-      data: result.rows,
-      total: result.rows.length
+      data: users,
+      total: users.length
     });
     
   } catch (error) {
@@ -56,21 +67,32 @@ export const createUser = async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(senha, saltRounds);
     
-    // Criar usuário
+    // Criar usuário - CORRIGIDO para usar nomes das colunas do Supabase
     const result = await pool.query(`
-      INSERT INTO usuarios (nome_completo, email, senha, perfil, ativo, created_at, updated_at)
+      INSERT INTO usuarios (nome_completo, email, senha_hash, perfil, ativo, data_criacao, data_atualizacao)
       VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-      RETURNING id, nome_completo, email, perfil, ativo, created_at
+      RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
     `, [nome_completo, email, hashedPassword, perfil]);
     
     const newUser = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: newUser.id,
+      nome_completo: newUser.nome_completo,
+      email: newUser.email,
+      perfil: newUser.perfil,
+      ativo: newUser.ativo,
+      created_at: newUser.data_criacao,
+      updated_at: newUser.data_atualizacao
+    };
     
     console.log(`👤 Usuário criado: ${email} por admin ID: ${req.user.id}`);
     
     res.status(201).json({
       success: true,
       message: 'Usuário criado com sucesso',
-      data: newUser
+      data: userResponse
     });
     
   } catch (error) {
@@ -89,13 +111,14 @@ export const getUserById = async (req, res) => {
     const requestingUserProfile = req.user.perfil;
     
     // Verificar se é admin ou se está buscando próprio perfil
-    if (requestingUserProfile !== 'admin' && parseInt(id) !== requestingUserId) {
+    if (requestingUserProfile !== 'admin' && id !== requestingUserId) {
       return res.status(403).json({
         success: false,
         message: 'Acesso negado'
       });
     }
     
+    // CORRIGIDO para usar nomes das colunas do Supabase
     const result = await pool.query(`
       SELECT 
         id, 
@@ -103,9 +126,8 @@ export const getUserById = async (req, res) => {
         email, 
         perfil, 
         ativo, 
-        created_at, 
-        updated_at, 
-        ultimo_login 
+        data_criacao, 
+        data_atualizacao
       FROM usuarios 
       WHERE id = $1
     `, [id]);
@@ -117,9 +139,22 @@ export const getUserById = async (req, res) => {
       });
     }
     
+    const user = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      perfil: user.perfil,
+      ativo: user.ativo,
+      created_at: user.data_criacao,
+      updated_at: user.data_atualizacao
+    };
+    
     res.json({
       success: true,
-      data: result.rows[0]
+      data: userResponse
     });
     
   } catch (error) {
@@ -164,7 +199,7 @@ export const updateUser = async (req, res) => {
       }
     }
     
-    // Preparar campos para atualização
+    // Preparar campos para atualização - CORRIGIDO para usar nomes das colunas do Supabase
     let updateFields = [];
     let updateValues = [];
     let paramCount = 1;
@@ -190,29 +225,41 @@ export const updateUser = async (req, res) => {
     if (senha) {
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(senha, saltRounds);
-      updateFields.push(`senha = $${paramCount}`);
+      updateFields.push(`senha_hash = $${paramCount}`);
       updateValues.push(hashedPassword);
       paramCount++;
     }
     
-    updateFields.push(`updated_at = NOW()`);
+    updateFields.push(`data_atualizacao = NOW()`);
     updateValues.push(id);
     
     const query = `
       UPDATE usuarios 
       SET ${updateFields.join(', ')}
       WHERE id = $${paramCount}
-      RETURNING id, nome_completo, email, perfil, ativo, created_at, updated_at
+      RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
     `;
     
     const result = await pool.query(query, updateValues);
+    const updatedUser = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: updatedUser.id,
+      nome_completo: updatedUser.nome_completo,
+      email: updatedUser.email,
+      perfil: updatedUser.perfil,
+      ativo: updatedUser.ativo,
+      created_at: updatedUser.data_criacao,
+      updated_at: updatedUser.data_atualizacao
+    };
     
     console.log(`✏️ Usuário ID ${id} atualizado por admin ID: ${req.user.id}`);
     
     res.json({
       success: true,
       message: 'Usuário atualizado com sucesso',
-      data: result.rows[0]
+      data: userResponse
     });
     
   } catch (error) {
@@ -230,18 +277,19 @@ export const deactivateUser = async (req, res) => {
     const requestingUserId = req.user.id;
     
     // Não permitir que usuário desative a si mesmo
-    if (parseInt(id) === requestingUserId) {
+    if (id === requestingUserId) {
       return res.status(400).json({
         success: false,
         message: 'Não é possível desativar sua própria conta'
       });
     }
     
+    // CORRIGIDO para usar data_atualizacao
     const result = await pool.query(`
       UPDATE usuarios 
-      SET ativo = false, updated_at = NOW()
+      SET ativo = false, data_atualizacao = NOW()
       WHERE id = $1 AND ativo = true
-      RETURNING id, nome_completo, email, ativo
+      RETURNING id, nome_completo, email, ativo, data_atualizacao
     `, [id]);
     
     if (result.rows.length === 0) {
@@ -251,12 +299,23 @@ export const deactivateUser = async (req, res) => {
       });
     }
     
+    const user = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      ativo: user.ativo,
+      updated_at: user.data_atualizacao
+    };
+    
     console.log(`🚫 Usuário ID ${id} desativado por admin ID: ${requestingUserId}`);
     
     res.json({
       success: true,
       message: 'Usuário desativado com sucesso',
-      data: result.rows[0]
+      data: userResponse
     });
     
   } catch (error) {
@@ -272,11 +331,12 @@ export const reactivateUser = async (req, res) => {
   try {
     const { id } = req.params;
     
+    // CORRIGIDO para usar data_atualizacao
     const result = await pool.query(`
       UPDATE usuarios 
-      SET ativo = true, updated_at = NOW()
+      SET ativo = true, data_atualizacao = NOW()
       WHERE id = $1 AND ativo = false
-      RETURNING id, nome_completo, email, ativo
+      RETURNING id, nome_completo, email, ativo, data_atualizacao
     `, [id]);
     
     if (result.rows.length === 0) {
@@ -286,12 +346,23 @@ export const reactivateUser = async (req, res) => {
       });
     }
     
+    const user = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      ativo: user.ativo,
+      updated_at: user.data_atualizacao
+    };
+    
     console.log(`✅ Usuário ID ${id} reativado por admin ID: ${req.user.id}`);
     
     res.json({
       success: true,
       message: 'Usuário reativado com sucesso',
-      data: result.rows[0]
+      data: userResponse
     });
     
   } catch (error) {
@@ -307,6 +378,7 @@ export const getUserProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     
+    // CORRIGIDO para usar nomes das colunas do Supabase
     const result = await pool.query(`
       SELECT 
         id, 
@@ -314,8 +386,7 @@ export const getUserProfile = async (req, res) => {
         email, 
         perfil, 
         ativo, 
-        created_at, 
-        ultimo_login 
+        data_criacao
       FROM usuarios 
       WHERE id = $1
     `, [userId]);
@@ -327,9 +398,21 @@ export const getUserProfile = async (req, res) => {
       });
     }
     
+    const user = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      perfil: user.perfil,
+      ativo: user.ativo,
+      created_at: user.data_criacao
+    };
+    
     res.json({
       success: true,
-      data: result.rows[0]
+      data: userResponse
     });
     
   } catch (error) {

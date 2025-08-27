@@ -1,4 +1,4 @@
-// controllers/authController.js
+// controllers/authController.js (CORRIGIDO PARA COLUNAS DO SUPABASE)
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
@@ -9,11 +9,20 @@ export const login = async (req, res) => {
     
     console.log(`🔐 Tentativa de login para: ${email}`);
     
-    // Buscar usuário
-    const result = await pool.query(
-      'SELECT * FROM usuarios WHERE email = $1 AND ativo = true',
-      [email]
-    );
+    // Buscar usuário - CORRIGIDO para nomes das colunas do Supabase
+    const result = await pool.query(`
+      SELECT 
+        id,
+        nome_completo,
+        email,
+        senha_hash,
+        perfil,
+        ativo,
+        data_criacao,
+        data_atualizacao
+      FROM usuarios 
+      WHERE email = $1 AND ativo = true
+    `, [email]);
     
     if (result.rows.length === 0) {
       console.log(`❌ Usuário não encontrado ou inativo: ${email}`);
@@ -24,9 +33,10 @@ export const login = async (req, res) => {
     }
     
     const user = result.rows[0];
+    console.log(`🔍 Usuário encontrado: ${user.email}, perfil: ${user.perfil}`);
     
-    // Verificar senha
-    const validPassword = await bcrypt.compare(senha, user.senha);
+    // Verificar senha - CORRIGIDO para usar senha_hash
+    const validPassword = await bcrypt.compare(senha, user.senha_hash);
     if (!validPassword) {
       console.log(`❌ Senha inválida para: ${email}`);
       return res.status(401).json({
@@ -46,14 +56,22 @@ export const login = async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
     
-    // Atualizar último login
+    // Atualizar último login - CORRIGIDO para usar data_atualizacao
     await pool.query(
-      'UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1',
+      'UPDATE usuarios SET data_atualizacao = NOW() WHERE id = $1',
       [user.id]
     );
     
-    // Remover senha da resposta
-    const { senha: _, ...userWithoutPassword } = user;
+    // Remover senha da resposta e normalizar nomes
+    const userResponse = {
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      perfil: user.perfil,
+      ativo: user.ativo,
+      created_at: user.data_criacao,
+      updated_at: user.data_atualizacao
+    };
     
     console.log(`✅ Login bem-sucedido para: ${email}`);
     
@@ -61,7 +79,7 @@ export const login = async (req, res) => {
       success: true,
       message: 'Login realizado com sucesso',
       token,
-      user: userWithoutPassword
+      user: userResponse
     });
     
   } catch (error) {
@@ -83,11 +101,19 @@ export const logout = (req, res) => {
 
 export const verify = async (req, res) => {
   try {
-    // Buscar dados atualizados do usuário
-    const result = await pool.query(
-      'SELECT id, nome_completo, email, perfil, ativo, created_at, ultimo_login FROM usuarios WHERE id = $1 AND ativo = true',
-      [req.user.id]
-    );
+    // Buscar dados atualizados do usuário - CORRIGIDO para colunas do Supabase
+    const result = await pool.query(`
+      SELECT 
+        id, 
+        nome_completo, 
+        email, 
+        perfil, 
+        ativo, 
+        data_criacao, 
+        data_atualizacao 
+      FROM usuarios 
+      WHERE id = $1 AND ativo = true
+    `, [req.user.id]);
     
     if (result.rows.length === 0) {
       return res.status(401).json({
@@ -96,9 +122,22 @@ export const verify = async (req, res) => {
       });
     }
     
+    const user = result.rows[0];
+    
+    // Normalizar nomes das colunas para resposta
+    const userResponse = {
+      id: user.id,
+      nome_completo: user.nome_completo,
+      email: user.email,
+      perfil: user.perfil,
+      ativo: user.ativo,
+      created_at: user.data_criacao,
+      updated_at: user.data_atualizacao
+    };
+    
     res.json({
       success: true,
-      user: result.rows[0]
+      user: userResponse
     });
     
   } catch (error) {
@@ -115,9 +154,9 @@ export const changePassword = async (req, res) => {
     const { senhaAtual, novaSenha } = req.body;
     const userId = req.user.id;
     
-    // Buscar usuário atual
+    // Buscar usuário atual - CORRIGIDO para senha_hash
     const result = await pool.query(
-      'SELECT senha FROM usuarios WHERE id = $1',
+      'SELECT senha_hash FROM usuarios WHERE id = $1',
       [userId]
     );
     
@@ -130,8 +169,8 @@ export const changePassword = async (req, res) => {
     
     const user = result.rows[0];
     
-    // Verificar senha atual
-    const validPassword = await bcrypt.compare(senhaAtual, user.senha);
+    // Verificar senha atual - CORRIGIDO para usar senha_hash
+    const validPassword = await bcrypt.compare(senhaAtual, user.senha_hash);
     if (!validPassword) {
       return res.status(401).json({
         success: false,
@@ -143,9 +182,9 @@ export const changePassword = async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(novaSenha, saltRounds);
     
-    // Atualizar senha
+    // Atualizar senha - CORRIGIDO para usar senha_hash e data_atualizacao
     await pool.query(
-      'UPDATE usuarios SET senha = $1, updated_at = NOW() WHERE id = $2',
+      'UPDATE usuarios SET senha_hash = $1, data_atualizacao = NOW() WHERE id = $2',
       [hashedPassword, userId]
     );
     

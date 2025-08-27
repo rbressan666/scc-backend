@@ -1,4 +1,4 @@
-// middleware/auth.js
+// middleware/auth.js (CORRIGIDO PARA COLUNAS DO SUPABASE)
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 
@@ -17,7 +17,7 @@ export const authenticateToken = async (req, res, next) => {
     // Verificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Verificar se usuário ainda existe e está ativo
+    // Verificar se usuário ainda existe e está ativo - CORRIGIDO para colunas do Supabase
     const result = await pool.query(
       'SELECT id, email, perfil, ativo FROM usuarios WHERE id = $1 AND ativo = true',
       [decoded.id]
