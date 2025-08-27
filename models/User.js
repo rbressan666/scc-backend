@@ -1,169 +1,237 @@
-import { query } from '../config/database.js';
+// models/User.js
+import pool from '../config/database.js';
 import bcrypt from 'bcrypt';
 
-class User {
-  constructor(userData) {
-    this.id = userData.id;
-    this.nome_completo = userData.nome_completo;
-    this.email = userData.email;
-    this.senha_hash = userData.senha_hash;
-    this.perfil = userData.perfil;
-    this.ativo = userData.ativo;
-    this.data_criacao = userData.data_criacao;
-    this.data_atualizacao = userData.data_atualizacao;
-  }
-
-  // Criar novo usuário
-  static async create(userData) {
-    const { nome_completo, email, senha, perfil = 'operador' } = userData;
-    
-    // Hash da senha
-    const saltRounds = 10;
-    const senha_hash = await bcrypt.hash(senha, saltRounds);
-    
-    const queryText = `
-      INSERT INTO usuarios (nome_completo, email, senha_hash, perfil)
-      VALUES ($1, LOWER($2), $3, $4)
-      RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
-    `;
-    
-    const values = [nome_completo, email, senha_hash, perfil];
-    const result = await query(queryText, values);
-    
-    return new User(result.rows[0]);
+export class User {
+  constructor(data) {
+    this.id = data.id;
+    this.nome_completo = data.nome_completo;
+    this.email = data.email;
+    this.perfil = data.perfil;
+    this.ativo = data.ativo;
+    this.created_at = data.created_at;
+    this.updated_at = data.updated_at;
+    this.ultimo_login = data.ultimo_login;
   }
 
   // Buscar usuário por email
   static async findByEmail(email) {
-    const queryText = 'SELECT * FROM usuarios WHERE email = LOWER($1) AND ativo = true';
-    const result = await query(queryText, [email]);
-    
-    if (result.rows.length === 0) {
-      return null;
+    try {
+      const result = await pool.query(
+        'SELECT * FROM usuarios WHERE email = $1',
+        [email]
+      );
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      return new User(result.rows[0]);
+    } catch (error) {
+      throw error;
     }
-    
-    return new User(result.rows[0]);
   }
 
   // Buscar usuário por ID
   static async findById(id) {
-    const queryText = 'SELECT * FROM usuarios WHERE id = $1';
-    const result = await query(queryText, [id]);
-    
-    if (result.rows.length === 0) {
-      return null;
+    try {
+      const result = await pool.query(
+        'SELECT * FROM usuarios WHERE id = $1',
+        [id]
+      );
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      return new User(result.rows[0]);
+    } catch (error) {
+      throw error;
     }
-    
-    return new User(result.rows[0]);
   }
 
-  // Listar todos os usuários
+  // Buscar todos os usuários
   static async findAll() {
-    const queryText = `
-      SELECT id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
-      FROM usuarios
-      ORDER BY data_criacao DESC
-    `;
-    const result = await query(queryText);
-    
-    return result.rows.map(row => new User(row));
+    try {
+      const result = await pool.query(`
+        SELECT 
+          id, 
+          nome_completo, 
+          email, 
+          perfil, 
+          ativo, 
+          created_at, 
+          updated_at, 
+          ultimo_login 
+        FROM usuarios 
+        ORDER BY created_at DESC
+      `);
+      
+      return result.rows.map(row => new User(row));
+    } catch (error) {
+      throw error;
+    }
   }
 
-  // Atualizar usuário
-  static async update(id, userData) {
-    const { nome_completo, email, perfil, ativo } = userData;
-    
-    const queryText = `
-      UPDATE usuarios 
-      SET nome_completo = $1, email = LOWER($2), perfil = $3, ativo = $4
-      WHERE id = $5
-      RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
-    `;
-    
-    const values = [nome_completo, email, perfil, ativo, id];
-    const result = await query(queryText, values);
-    
-    if (result.rows.length === 0) {
-      return null;
+  // Criar novo usuário
+  static async create(userData) {
+    try {
+      const { nome_completo, email, senha, perfil } = userData;
+      
+      // Hash da senha
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(senha, saltRounds);
+      
+      const result = await pool.query(`
+        INSERT INTO usuarios (nome_completo, email, senha, perfil, ativo, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+        RETURNING id, nome_completo, email, perfil, ativo, created_at, updated_at
+      `, [nome_completo, email, hashedPassword, perfil]);
+      
+      return new User(result.rows[0]);
+    } catch (error) {
+      throw error;
     }
-    
-    return new User(result.rows[0]);
-  }
-
-  // Atualizar senha
-  static async updatePassword(id, novaSenha) {
-    const saltRounds = 10;
-    const senha_hash = await bcrypt.hash(novaSenha, saltRounds);
-    
-    const queryText = `
-      UPDATE usuarios 
-      SET senha_hash = $1
-      WHERE id = $2
-      RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
-    `;
-    
-    const result = await query(queryText, [senha_hash, id]);
-    
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    return new User(result.rows[0]);
-  }
-
-  // Desativar usuário (exclusão lógica)
-  static async deactivate(id) {
-    const queryText = `
-      UPDATE usuarios 
-      SET ativo = false
-      WHERE id = $1
-      RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
-    `;
-    
-    const result = await query(queryText, [id]);
-    
-    if (result.rows.length === 0) {
-      return null;
-    }
-    
-    return new User(result.rows[0]);
   }
 
   // Verificar senha
-  async verifyPassword(senha) {
-    return await bcrypt.compare(senha, this.senha_hash);
+  async verifyPassword(password) {
+    try {
+      const result = await pool.query(
+        'SELECT senha FROM usuarios WHERE id = $1',
+        [this.id]
+      );
+      
+      if (result.rows.length === 0) {
+        return false;
+      }
+      
+      return await bcrypt.compare(password, result.rows[0].senha);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Atualizar último login
+  async updateLastLogin() {
+    try {
+      await pool.query(
+        'UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1',
+        [this.id]
+      );
+      
+      // Atualizar instância local
+      this.ultimo_login = new Date();
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Atualizar dados do usuário
+  async update(updateData) {
+    try {
+      const fields = [];
+      const values = [];
+      let paramCount = 1;
+
+      // Construir query dinamicamente
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] !== undefined && key !== 'id') {
+          fields.push(`${key} = $${paramCount}`);
+          values.push(updateData[key]);
+          paramCount++;
+        }
+      });
+
+      if (fields.length === 0) {
+        throw new Error('Nenhum campo para atualizar');
+      }
+
+      fields.push('updated_at = NOW()');
+      values.push(this.id);
+
+      const query = `
+        UPDATE usuarios 
+        SET ${fields.join(', ')}
+        WHERE id = $${paramCount}
+        RETURNING id, nome_completo, email, perfil, ativo, created_at, updated_at, ultimo_login
+      `;
+
+      const result = await pool.query(query, values);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Usuário não encontrado');
+      }
+
+      // Atualizar instância atual
+      Object.assign(this, result.rows[0]);
+      
+      return this;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Desativar usuário
+  async deactivate() {
+    try {
+      const result = await pool.query(`
+        UPDATE usuarios 
+        SET ativo = false, updated_at = NOW()
+        WHERE id = $1
+        RETURNING ativo, updated_at
+      `, [this.id]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Usuário não encontrado');
+      }
+      
+      this.ativo = false;
+      this.updated_at = result.rows[0].updated_at;
+      
+      return this;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Reativar usuário
+  async reactivate() {
+    try {
+      const result = await pool.query(`
+        UPDATE usuarios 
+        SET ativo = true, updated_at = NOW()
+        WHERE id = $1
+        RETURNING ativo, updated_at
+      `, [this.id]);
+      
+      if (result.rows.length === 0) {
+        throw new Error('Usuário não encontrado');
+      }
+      
+      this.ativo = true;
+      this.updated_at = result.rows[0].updated_at;
+      
+      return this;
+    } catch (error) {
+      throw error;
+    }
   }
 
   // Converter para JSON (sem senha)
   toJSON() {
-    const { senha_hash, ...userWithoutPassword } = this;
+    const { senha, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }
 
-  // Inicializar usuário administrador padrão
-  static async initializeAdminUser() {
-    try {
-      // Verificar se já existe o usuário admin
-      const existingAdmin = await User.findByEmail('roberto.fujiy@gmail.com');
-      
-      if (!existingAdmin) {
-        console.log('🔧 Criando usuário administrador inicial...');
-        
-        const adminData = {
-          nome_completo: 'Roberto Bressan',
-          email: 'roberto.fujiy@gmail.com',
-          senha: 'Cadoz@001',
-          perfil: 'admin'
-        };
-        
-        await User.create(adminData);
-        console.log('✅ Usuário administrador criado com sucesso!');
-      } else {
-        console.log('ℹ️ Usuário administrador já existe');
-      }
-    } catch (error) {
-      console.error('❌ Erro ao inicializar usuário administrador:', error);
-    }
+  // Verificar se é admin
+  isAdmin() {
+    return this.perfil === 'admin';
+  }
+
+  // Verificar se está ativo
+  isActive() {
+    return this.ativo === true;
   }
 }
 

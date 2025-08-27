@@ -1,35 +1,38 @@
+// middleware/auth.js
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import pool from '../config/database.js';
 
-// Middleware para verificar token JWT
-const authenticateToken = async (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
+    
     if (!token) {
       return res.status(401).json({
         success: false,
         message: 'Token de acesso requerido'
       });
     }
-
-    // Verificar e decodificar o token
+    
+    // Verificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Buscar o usuário no banco de dados
-    const user = await User.findById(decoded.userId);
+    // Verificar se usuário ainda existe e está ativo
+    const result = await pool.query(
+      'SELECT id, email, perfil, ativo FROM usuarios WHERE id = $1 AND ativo = true',
+      [decoded.id]
+    );
     
-    if (!user || !user.ativo) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Usuário não encontrado ou inativo'
       });
     }
-
-    // Adicionar informações do usuário à requisição
-    req.user = user;
+    
+    req.user = result.rows[0];
     next();
+    
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
@@ -44,87 +47,22 @@ const authenticateToken = async (req, res, next) => {
         message: 'Token expirado'
       });
     }
-
+    
     console.error('Erro na autenticação:', error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: 'Erro interno do servidor'
     });
   }
 };
 
-// Middleware para verificar se o usuário é admin
-const requireAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      message: 'Usuário não autenticado'
-    });
-  }
-
+export const requireAdmin = (req, res, next) => {
   if (req.user.perfil !== 'admin') {
     return res.status(403).json({
       success: false,
-      message: 'Acesso negado. Permissões de administrador requeridas.'
+      message: 'Acesso negado. Apenas administradores podem acessar este recurso.'
     });
   }
-
   next();
-};
-
-// Middleware para verificar se o usuário pode acessar seus próprios dados ou é admin
-const requireOwnershipOrAdmin = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      message: 'Usuário não autenticado'
-    });
-  }
-
-  const requestedUserId = req.params.id;
-  const currentUserId = req.user.id;
-  const isAdmin = req.user.perfil === 'admin';
-
-  if (!isAdmin && requestedUserId !== currentUserId) {
-    return res.status(403).json({
-      success: false,
-      message: 'Acesso negado. Você só pode acessar seus próprios dados.'
-    });
-  }
-
-  next();
-};
-
-// Função para gerar token JWT
-const generateToken = (user) => {
-  const payload = {
-    userId: user.id,
-    email: user.email,
-    perfil: user.perfil
-  };
-
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
-  });
-};
-
-// Função para gerar refresh token (para implementação futura)
-const generateRefreshToken = (user) => {
-  const payload = {
-    userId: user.id,
-    type: 'refresh'
-  };
-
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: '7d'
-  });
-};
-
-export {
-  authenticateToken,
-  requireAdmin,
-  requireOwnershipOrAdmin,
-  generateToken,
-  generateRefreshToken
 };
 

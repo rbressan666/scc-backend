@@ -1,60 +1,32 @@
+// routes/users.js
 import express from 'express';
-const router = express.Router();
-import UserController from '../controllers/userController.js';
-import { authenticateToken, requireAdmin, requireOwnershipOrAdmin } from '../middleware/auth.js';
-import { createUserValidators, updateUserValidators, userIdValidators } from '../middleware/validators.js';
+import { 
+  getAllUsers, 
+  createUser, 
+  getUserById, 
+  updateUser, 
+  deactivateUser,
+  reactivateUser,
+  getUserProfile
+} from '../controllers/userController.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { validateCreateUser, validateUpdateUser } from '../middleware/validators.js';
 
-// Todas as rotas de usuários requerem autenticação
+const router = express.Router();
+
+// Todas as rotas requerem autenticação
 router.use(authenticateToken);
 
-/**
- * @route   GET /api/usuarios/profile
- * @desc    Obter perfil do usuário logado
- * @access  Private
- */
-router.get('/profile', UserController.getProfile);
+// Rota para perfil do usuário logado
+router.get('/profile', getUserProfile);
 
-/**
- * @route   GET /api/usuarios
- * @desc    Listar todos os usuários
- * @access  Private (Admin only)
- */
-router.get('/', requireAdmin, UserController.getAll);
-
-/**
- * @route   GET /api/usuarios/:id
- * @desc    Buscar usuário por ID
- * @access  Private (Admin ou próprio usuário)
- */
-router.get('/:id', userIdValidators, requireOwnershipOrAdmin, UserController.getById);
-
-/**
- * @route   POST /api/usuarios
- * @desc    Criar novo usuário
- * @access  Private (Admin only)
- */
-router.post('/', requireAdmin, createUserValidators, UserController.create);
-
-/**
- * @route   PUT /api/usuarios/:id
- * @desc    Atualizar dados do usuário
- * @access  Private (Admin only)
- */
-router.put('/:id', requireAdmin, updateUserValidators, UserController.update);
-
-/**
- * @route   DELETE /api/usuarios/:id
- * @desc    Desativar usuário (exclusão lógica)
- * @access  Private (Admin only)
- */
-router.delete('/:id', requireAdmin, userIdValidators, UserController.deactivate);
-
-/**
- * @route   PUT /api/usuarios/:id/reactivate
- * @desc    Reativar usuário
- * @access  Private (Admin only)
- */
-router.put('/:id/reactivate', requireAdmin, userIdValidators, UserController.reactivate);
+// Rotas que requerem admin
+router.get('/', requireAdmin, getAllUsers);
+router.post('/', requireAdmin, validateCreateUser, createUser);
+router.get('/:id', getUserById);
+router.put('/:id', requireAdmin, validateUpdateUser, updateUser);
+router.delete('/:id', requireAdmin, deactivateUser);
+router.put('/:id/reactivate', requireAdmin, reactivateUser);
 
 export default router;
 
