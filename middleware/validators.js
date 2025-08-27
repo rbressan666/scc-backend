@@ -19,7 +19,7 @@ export const validateLogin = [
   body('email')
     .isEmail()
     .withMessage('Email deve ser válido')
-    .normalizeEmail(),
+    .normalizeEmail({ gmail_remove_dots: false }),
   body('senha')
     .isLength({ min: 6 })
     .withMessage('Senha deve ter pelo menos 6 caracteres'),
@@ -35,7 +35,7 @@ export const validateCreateUser = [
   body('email')
     .isEmail()
     .withMessage('Email deve ser válido')
-    .normalizeEmail(),
+    .normalizeEmail({ gmail_remove_dots: false }),
   body('senha')
     .isLength({ min: 8 })
     .withMessage('Senha deve ter pelo menos 8 caracteres')
@@ -58,7 +58,7 @@ export const validateUpdateUser = [
     .optional()
     .isEmail()
     .withMessage('Email deve ser válido')
-    .normalizeEmail(),
+    .normalizeEmail({ gmail_remove_dots: false }),
   body('senha')
     .optional()
     .isLength({ min: 8 })
