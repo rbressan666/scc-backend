@@ -1,10 +1,9 @@
 // server.js (VERSÃO CORRIGIDA)
-
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import pool from './config/database.js'; // <-- IMPORTANTE: Importa a conexão correta
-import userRoutes from './routes/users.js';
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const pool = require('./config/database.js'); // <-- IMPORTANTE: Importa a conexão correta
+const userRoutes = require('./routes/users.js');
 
 dotenv.config();
 
@@ -23,10 +22,9 @@ app.get('/', (req, res) => {
 // Rotas da Aplicação
 app.use('/api/users', userRoutes);
 
-
 // Função para testar a conexão com o banco de dados
 const testConnection = async () => {
-  console.log('🔍 Testando conexão com o banco de dados...');
+  console.log('🔄 Testando conexão com o banco de dados...');
   try {
     const client = await pool.connect();
     console.log('✅ Conexão com o banco de dados bem-sucedida!');
@@ -43,8 +41,8 @@ const startServer = async () => {
   console.log('🚀 Iniciando SCC Backend...');
   
   if (await testConnection()) {
-    app.listen(PORT, () => {
-      console.log(`🎉 Servidor rodando com sucesso na porta ${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Servidor rodando com sucesso na porta ${PORT}`);
     });
   } else {
     console.error('❌ Falha na conexão com o banco de dados. O servidor não será iniciado.');
