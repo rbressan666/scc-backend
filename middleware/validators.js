@@ -1,4 +1,4 @@
-const { body, param } = require('express-validator');
+import { body, param } from 'express-validator';
 
 // Validadores para autenticação
 const loginValidators = [
@@ -126,7 +126,7 @@ const sanitizeInput = [
   body('*').trim().escape()
 ];
 
-module.exports = {
+export {
   loginValidators,
   changePasswordValidators,
   createUserValidators,

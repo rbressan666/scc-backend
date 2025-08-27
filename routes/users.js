@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const UserController = require('../controllers/userController');
-const { authenticateToken, requireAdmin, requireOwnershipOrAdmin } = require('../middleware/auth');
-const { createUserValidators, updateUserValidators, userIdValidators } = require('../middleware/validators');
+import UserController from '../controllers/userController.js';
+import { authenticateToken, requireAdmin, requireOwnershipOrAdmin } from '../middleware/auth.js';
+import { createUserValidators, updateUserValidators, userIdValidators } from '../middleware/validators.js';
 
 // Todas as rotas de usuários requerem autenticação
 router.use(authenticateToken);
@@ -56,5 +56,5 @@ router.delete('/:id', requireAdmin, userIdValidators, UserController.deactivate)
  */
 router.put('/:id/reactivate', requireAdmin, userIdValidators, UserController.reactivate);
 
-module.exports = router;
+export default router;
 

@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 // Middleware para verificar token JWT
 const authenticateToken = async (req, res, next) => {
@@ -120,7 +120,7 @@ const generateRefreshToken = (user) => {
   });
 };
 
-module.exports = {
+export {
   authenticateToken,
   requireAdmin,
   requireOwnershipOrAdmin,

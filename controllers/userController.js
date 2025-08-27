@@ -1,5 +1,5 @@
-const User = require('../models/User');
-const { validationResult } = require('express-validator');
+import User from '../models/User.js';
+import { validationResult } from 'express-validator';
 
 class UserController {
   // Listar todos os usuários
@@ -275,5 +275,5 @@ class UserController {
   }
 }
 
-module.exports = UserController;
+export default UserController;
 

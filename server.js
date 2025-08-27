@@ -4,7 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './config/database.js'; // <-- IMPORTANTE: Importa a conexão correta
-import userRoutes from './routes/userRoutes.js';
+import userRoutes from './routes/users.js';
 
 dotenv.config();
 
