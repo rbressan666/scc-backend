@@ -46,7 +46,7 @@ export const login = async (req, res) => {
     // Teste com senha hardcoded
     const testResult = await bcrypt.compare('Cadoz@001', user.senha_hash);
     console.log('🧪 TESTE COM SENHA HARDCODED Cadoz@001:', testResult);
-    
+
     if (!validPassword) {
       console.log(`❌ Senha inválida para: ${email}`);
       return res.status(401).json({
@@ -91,6 +91,13 @@ export const login = async (req, res) => {
       token,
       user: userResponse
     });
+    
+    console.log('📤 RESPOSTA ENVIADA:', JSON.stringify({
+      success: true,
+      message: 'Login realizado com sucesso',
+      token,
+      user: userResponse
+    }));
     
   } catch (error) {
     console.error('Erro no login:', error);
