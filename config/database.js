@@ -8,6 +8,7 @@ const pool = new Pool({
   max: 20, // máximo de conexões no pool
   idleTimeoutMillis: 30000, // tempo limite para conexões inativas
   connectionTimeoutMillis: 2000, // tempo limite para estabelecer conexão
+  family: 4
 });
 
 // Event listeners para monitoramento
