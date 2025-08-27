@@ -32,27 +32,21 @@ export const login = async (req, res) => {
       });
     }
     
-    // CÓDIGO TEMPORÁRIO PARA DEBUG - ADICIONE ANTES DA VERIFICAÇÃO
-    const bcryptTest = await bcrypt.hash(senha, 12);
-    console.log('🧪 HASH GERADO DA SENHA DIGITADA:', bcryptTest);
-
-    // Teste direto com a senha conhecida
-    const testPassword = 'Cadoz@001';
-    const testResult = await bcrypt.compare(testPassword, user.senha_hash);
-    console.log('🧪 TESTE COM SENHA HARDCODED:', testResult);
-
-
-    // Verificar senha - CORRIGIDO para usar senha_hash
+    const user = result.rows[0];
+    console.log(`🔍 Usuário encontrado: ${user.email}, perfil: ${user.perfil}`);
+    
     console.log('🔍 SENHA DIGITADA:', senha);
     console.log('🔍 HASH DO BANCO:', user.senha_hash);
-    console.log('🔍 TIPO SENHA:', typeof senha);
-    console.log('🔍 TIPO HASH:', typeof user.senha_hash);
-    console.log('🔍 COMPRIMENTO SENHA:', senha.length);
-    console.log('🔍 COMPRIMENTO HASH:', user.senha_hash.length);
-
+    console.log('🧪 HASH GERADO DA SENHA DIGITADA:', await bcrypt.hash(senha, 12));
+    
+    // Verificar senha
     const validPassword = await bcrypt.compare(senha, user.senha_hash);
     console.log('🔍 RESULTADO BCRYPT.COMPARE:', validPassword);
-
+    
+    // Teste com senha hardcoded
+    const testResult = await bcrypt.compare('Cadoz@001', user.senha_hash);
+    console.log('🧪 TESTE COM SENHA HARDCODED Cadoz@001:', testResult);
+    
     if (!validPassword) {
       console.log(`❌ Senha inválida para: ${email}`);
       return res.status(401).json({
