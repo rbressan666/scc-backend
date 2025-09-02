@@ -1,4 +1,4 @@
-// server.js (VERSÃO CORRIGIDA PARA ES6)
+// server.js (CORRIGIDO PARA QR CODE)
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -15,6 +15,19 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Criar servidor HTTP
+const server = createServer(app);
+
+// Configurar Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
+});
 
 // Middlewares
 app.use(helmet());
@@ -43,26 +56,21 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Rota de Teste
+// Rota principal
 app.get('/', (req, res) => {
-  res.send('<h1>API do SCC Backend está no ar!</h1>');
-});
-
-// Informações da API
-app.get('/api', (req, res) => {
   res.json({
-    name: 'SCC Backend API',
+    success: true,
+    message: 'API do SCC Backend está no ar!',
     version: '1.0.0',
-    description: 'Sistema Contagem Cadoz - Backend MVP1',
     endpoints: {
+      health: '/health',
       auth: '/api/auth',
-      users: '/api/usuarios',
-      health: '/health'
+      users: '/api/usuarios'
     }
   });
 });
 
-// Rotas da Aplicação
+// Rotas da aplicação
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', userRoutes);
 
@@ -83,48 +91,71 @@ app.use('*', (req, res) => {
   });
 });
 
-// Função para testar a conexão com o banco de dados
-const testConnection = async () => {
-  console.log('🔄 Testando conexão com o banco de dados...');
+// Função para testar conexão com banco
+async function testDatabaseConnection() {
   try {
-    const client = await pool.connect();
-    console.log('✅ Conexão com o banco de dados bem-sucedida!');
-    client.release();
+    const result = await pool.query('SELECT NOW()');
+    console.log('✅ Conexão com banco de dados estabelecida');
     return true;
   } catch (error) {
-    console.error('❌ Falha no teste de conexão:', error);
+    console.error('❌ Erro ao conectar com banco de dados:', error.message);
     return false;
   }
-};
+}
 
-// Função para iniciar o servidor
-const startServer = async () => {
-  console.log('🚀 Iniciando SCC Backend...');
+// Inicializar servidor
+async function startServer() {
+  const dbConnected = await testDatabaseConnection();
   
-  if (await testConnection()) {
-    const server = createServer(app);
-    
-    // Configurar Socket.IO para QR Code
-    const io = new Server(server, {
-      cors: {
-        origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-        methods: ['GET', 'POST']
-      }
-    });
-    
-    // Inicializar serviço de QR Code
+  if (dbConnected) {
+    // Inicializar serviço de QR Code com Socket.IO
     qrCodeService.initialize(io);
+    console.log('🔗 Serviço de QR Code inicializado');
     
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Servidor rodando com sucesso na porta ${PORT}`);
       console.log(`🌐 URL: http://localhost:${PORT}`);
-      console.log(`🔗 Health Check: http://localhost:${PORT}/health`);
+      console.log(`🔌 WebSocket habilitado para QR Code`);
+      console.log(`📱 Endpoints disponíveis:`);
+      console.log(`   - GET  /health`);
+      console.log(`   - POST /api/auth/login`);
+      console.log(`   - POST /api/auth/logout`);
+      console.log(`   - GET  /api/auth/verify`);
+      console.log(`   - GET  /api/usuarios`);
+      console.log(`   - POST /api/usuarios`);
     });
   } else {
     console.error('❌ Falha na conexão com o banco de dados. O servidor não será iniciado.');
     process.exit(1);
   }
-};
+}
+
+// Tratamento de sinais do sistema
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM recebido. Encerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor encerrado graciosamente');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT recebido. Encerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor encerrado graciosamente');
+    process.exit(0);
+  });
+});
+
+// Tratamento de erros não capturados
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
+});
 
 // Inicia o servidor
 startServer();

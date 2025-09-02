@@ -1,7 +1,8 @@
-// services/qrCodeService.js
+// services/qrCodeService.js (CORRIGIDO)
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
+import QRCode from 'qrcode';
 
 class QRCodeService {
   constructor() {
@@ -21,14 +22,15 @@ class QRCodeService {
       console.log(`🔌 Cliente conectado: ${socket.id}`);
       
       // Gerar QR Code
-      socket.on('generate-qr', (callback) => {
+      socket.on('generate-qr', async (callback) => {
         try {
+          console.log('📱 Solicitação de geração de QR Code recebida');
           const sessionData = this.generateQRSession();
           
           if (callback && typeof callback === 'function') {
             callback({
               success: true,
-              qrCodeData: sessionData.qrData,
+              qrCodeData: sessionData.qrCodeData,
               sessionId: sessionData.sessionId,
               expiresIn: 5 * 60 * 1000 // 5 minutos em ms
             });
@@ -45,7 +47,7 @@ class QRCodeService {
           }
         }
       });
-      
+
       // Validar QR Code escaneado
       socket.on('validate-qr', async (data, callback) => {
         try {
@@ -74,7 +76,7 @@ class QRCodeService {
           }
         }
       });
-      
+
       // Confirmar login via mobile
       socket.on('confirm-login', async (data, callback) => {
         try {
@@ -105,22 +107,34 @@ class QRCodeService {
           }
         }
       });
-      
+
+      // Listener para QR expirado
+      socket.on('qr-expired', (data) => {
+        try {
+          const { sessionId } = data;
+          this.sessions.delete(sessionId);
+          setShowQRCode(false);
+          setQrStatus('');
+          setError('QR Code expirado. Gere um novo código.');
+        } catch (error) {
+          console.error('Erro ao processar QR expirado:', error);
+        }
+      });
+
       // Cancelar sessão QR
       socket.on('cancel-qr', (data) => {
         try {
           const { sessionId } = data;
-          this.cancelSession(sessionId);
-          
-          // Notificar outros clientes
-          socket.broadcast.emit('qr-cancelled', { sessionId });
-          
-          console.log(`❌ Sessão QR cancelada: ${sessionId}`);
+          if (this.sessions.has(sessionId)) {
+            this.sessions.delete(sessionId);
+            setShowQRCode(false);
+            setQrStatus('');
+          }
         } catch (error) {
-          console.error('Erro ao cancelar sessão QR:', error);
+          console.error('Erro ao cancelar QR:', error);
         }
       });
-      
+
       socket.on('disconnect', () => {
         console.log(`🔌 Cliente desconectado: ${socket.id}`);
       });
@@ -129,41 +143,45 @@ class QRCodeService {
 
   generateQRSession() {
     const sessionId = uuidv4();
-    const qrData = `scc-login:${sessionId}:${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
+    const expiresAt = Date.now() + (5 * 60 * 1000); // 5 minutos
     
-    this.sessions.set(sessionId, {
-      qrData,
-      userId: null,
+    const sessionData = {
+      sessionId,
       expiresAt,
-      status: 'pending'
+      status: 'waiting' // 'waiting', 'scanned', 'confirmed', 'expired'
+    };
+    
+    this.sessions.set(sessionId, sessionData);
+    
+    // Gerar URL do QR Code com dados da sessão
+    const qrData = JSON.stringify({
+      sessionId,
+      timestamp: Date.now(),
+      action: 'scc-login'
     });
     
-    return { sessionId, qrData };
+    return {
+      sessionId,
+      qrCodeData: qrData,
+      expiresAt
+    };
   }
 
   async validateQRCode(qrData, userCredentials) {
     try {
-      // Extrair sessionId do QR data
-      const parts = qrData.split(':');
-      if (parts.length !== 3 || parts[0] !== 'scc-login') {
+      const parsedData = JSON.parse(qrData);
+      const { sessionId } = parsedData;
+      
+      if (!this.sessions.has(sessionId)) {
         return {
           success: false,
-          message: 'QR Code inválido'
+          message: 'Sessão não encontrada ou expirada'
         };
       }
       
-      const sessionId = parts[1];
       const session = this.sessions.get(sessionId);
       
-      if (!session) {
-        return {
-          success: false,
-          message: 'Sessão não encontrada'
-        };
-      }
-      
-      if (session.expiresAt < new Date()) {
+      if (Date.now() > session.expiresAt) {
         this.sessions.delete(sessionId);
         return {
           success: false,
@@ -171,30 +189,42 @@ class QRCodeService {
         };
       }
       
-      if (session.status !== 'pending') {
+      if (session.status !== 'waiting') {
         return {
           success: false,
-          message: 'QR Code já foi usado'
+          message: 'QR Code já foi utilizado'
         };
       }
       
       // Validar credenciais do usuário
       const { email, senha } = userCredentials;
-      const userResult = await pool.query(
-        'SELECT * FROM usuarios WHERE email = $1 AND ativo = true',
-        [email]
-      );
       
-      if (userResult.rows.length === 0) {
+      const result = await pool.query(`
+        SELECT 
+          id,
+          nome_completo,
+          email,
+          senha_hash,
+          perfil,
+          ativo,
+          data_criacao,
+          data_atualizacao
+        FROM usuarios 
+        WHERE email = $1 AND ativo = true
+      `, [email]);
+      
+      if (result.rows.length === 0) {
         return {
           success: false,
-          message: 'Credenciais inválidas'
+          message: 'Usuário não encontrado'
         };
       }
       
-      const user = userResult.rows[0];
+      const user = result.rows[0];
+      
+      // Verificar senha (assumindo que você tem bcrypt importado)
       const bcrypt = await import('bcrypt');
-      const validPassword = await bcrypt.compare(senha, user.senha);
+      const validPassword = await bcrypt.compare(senha, user.senha_hash);
       
       if (!validPassword) {
         return {
@@ -203,9 +233,19 @@ class QRCodeService {
         };
       }
       
-      // Atualizar sessão
+      // Atualizar status da sessão
+      session.status = 'scanned';
       session.userId = user.id;
-      session.status = 'validated';
+      session.user = {
+        id: user.id,
+        nome_completo: user.nome_completo,
+        email: user.email,
+        perfil: user.perfil,
+        ativo: user.ativo,
+        created_at: user.data_criacao,
+        updated_at: user.data_atualizacao
+      };
+      
       this.sessions.set(sessionId, session);
       
       return {
@@ -215,7 +255,7 @@ class QRCodeService {
       };
       
     } catch (error) {
-      console.error('Erro na validação do QR Code:', error);
+      console.error('Erro ao validar QR Code:', error);
       return {
         success: false,
         message: 'Erro interno do servidor'
@@ -225,16 +265,23 @@ class QRCodeService {
 
   async confirmLogin(sessionId) {
     try {
-      const session = this.sessions.get(sessionId);
-      
-      if (!session) {
+      if (!this.sessions.has(sessionId)) {
         return {
           success: false,
           message: 'Sessão não encontrada'
         };
       }
       
-      if (session.expiresAt < new Date()) {
+      const session = this.sessions.get(sessionId);
+      
+      if (session.status !== 'scanned') {
+        return {
+          success: false,
+          message: 'QR Code não foi escaneado ou já foi confirmado'
+        };
+      }
+      
+      if (Date.now() > session.expiresAt) {
         this.sessions.delete(sessionId);
         return {
           success: false,
@@ -242,59 +289,31 @@ class QRCodeService {
         };
       }
       
-      if (session.status !== 'validated') {
-        return {
-          success: false,
-          message: 'Sessão não validada'
-        };
-      }
-      
-      // Buscar dados do usuário
-      const userResult = await pool.query(
-        'SELECT id, nome_completo, email, perfil, ativo FROM usuarios WHERE id = $1 AND ativo = true',
-        [session.userId]
-      );
-      
-      if (userResult.rows.length === 0) {
-        return {
-          success: false,
-          message: 'Usuário não encontrado'
-        };
-      }
-      
-      const user = userResult.rows[0];
-      
       // Gerar token JWT
       const token = jwt.sign(
         { 
-          id: user.id, 
-          email: user.email, 
-          perfil: user.perfil 
+          id: session.user.id, 
+          email: session.user.email, 
+          perfil: session.user.perfil 
         },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
       
-      // Atualizar último login
-      await pool.query(
-        'UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1',
-        [user.id]
-      );
-      
-      // Marcar sessão como concluída
-      session.status = 'completed';
+      // Atualizar status da sessão
+      session.status = 'confirmed';
       this.sessions.set(sessionId, session);
       
-      // Remover sessão após 1 minuto
+      // Limpar sessão após 1 minuto
       setTimeout(() => {
         this.sessions.delete(sessionId);
-      }, 60 * 1000);
+      }, 60000);
       
       return {
         success: true,
         token,
-        user,
-        message: 'Login confirmado com sucesso'
+        user: session.user,
+        sessionId
       };
       
     } catch (error) {
@@ -306,41 +325,31 @@ class QRCodeService {
     }
   }
 
-  cancelSession(sessionId) {
-    this.sessions.delete(sessionId);
-  }
-
   cleanupExpiredSessions() {
-    const now = new Date();
-    let cleanedCount = 0;
-    
+    const now = Date.now();
     for (const [sessionId, session] of this.sessions.entries()) {
-      if (session.expiresAt < now) {
+      if (now > session.expiresAt) {
         this.sessions.delete(sessionId);
-        cleanedCount++;
+        console.log(`🧹 Sessão expirada removida: ${sessionId}`);
       }
-    }
-    
-    if (cleanedCount > 0) {
-      console.log(`🧹 Limpeza: ${cleanedCount} sessões QR expiradas removidas`);
     }
   }
 
   getSessionStatus(sessionId) {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
+    if (!this.sessions.has(sessionId)) {
       return { exists: false };
     }
     
+    const session = this.sessions.get(sessionId);
     return {
       exists: true,
       status: session.status,
       expiresAt: session.expiresAt,
-      expired: session.expiresAt < new Date()
+      expired: Date.now() > session.expiresAt
     };
   }
 }
 
+// Exportar instância única
 export const qrCodeService = new QRCodeService();
-export default qrCodeService;
 
