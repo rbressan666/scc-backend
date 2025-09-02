@@ -1,21 +1,16 @@
+# .dockerignore (CORRIGIDO)
 node_modules
 npm-debug.log
 .env
-.env.local
-.env.development
-.env.test
 .git
 .gitignore
 README.md
-.nyc_output
+Dockerfile
+.dockerignore
 coverage
-.coverage
-.cache
-.parcel-cache
-.DS_Store
+.nyc_output
+.vscode
+.idea
 *.log
-logs
-*.tgz
-.npm
-.eslintcache
+package-lock.json
 

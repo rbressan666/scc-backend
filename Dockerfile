@@ -1,4 +1,4 @@
-# Use Node.js 18 LTS como base
+# Dockerfile (CORRIGIDO)
 FROM node:18-alpine
 
 # Definir diretório de trabalho
@@ -7,23 +7,18 @@ WORKDIR /app
 # Copiar arquivos de dependências
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm ci --only=production
+# Instalar dependências (usando npm install em vez de npm ci)
+RUN npm install --only=production
 
 # Copiar código fonte
 COPY . .
 
-# Criar usuário não-root para segurança
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-
-# Alterar propriedade dos arquivos
-RUN chown -R nodejs:nodejs /app
-USER nodejs
-
 # Expor porta
 EXPOSE 3000
 
-# Comando de inicialização
-CMD ["npm", "start"]
+# Definir variável de ambiente
+ENV NODE_ENV=production
+
+# Comando para iniciar a aplicação
+CMD ["node", "server.js"]
 
