@@ -13,4 +13,4 @@ coverage
 .idea
 *.log
 package-lock.json
-
+scc-database
