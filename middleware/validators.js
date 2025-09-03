@@ -47,24 +47,24 @@ export const validateCreateUser = [
 
 // Validação para atualização de usuário
 export const validateUpdateUser = [
-  body(\'nome_completo\')
+  body('nome_completo')
     .optional()
     .isLength({ min: 2, max: 100 })
-    .withMessage(\'Nome completo deve ter entre 2 e 100 caracteres\')
+    .withMessage('Nome completo deve ter entre 2 e 100 caracteres')
     .trim(),
-  body(\'email\')
+  body('email')
     .optional()
     .isEmail()
-    .withMessage(\'Email deve ser válido\')
+    .withMessage('Email deve ser válido')
     .normalizeEmail({ gmail_remove_dots: false }),
-  body(\'senha\')
+  body('senha')
     .optional()
     .isLength({ min: 6 })
-    .withMessage(\'Senha deve ter pelo menos 6 caracteres\'),
-  body(\'perfil\')
+    .withMessage('Senha deve ter pelo menos 6 caracteres'),
+  body('perfil')
     .optional()
-    .isIn([\'admin\', \'operador\', \'usuario\'])
-    .withMessage(\'Perfil deve ser admin, operador ou usuario\'),
+    .isIn(['admin', 'operador', 'usuario'])
+    .withMessage('Perfil deve ser admin, operador ou usuario'),
   handleValidationErrors
 ];
 
