@@ -9,6 +9,12 @@ import { Server } from 'socket.io';
 import pool from './config/database.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
+import setorRoutes from './routes/setores.js';
+import categoriaRoutes from './routes/categorias.js';
+import unidadeMedidaRoutes from './routes/unidades-medida.js';
+import produtoRoutes from './routes/produtos.js';
+import variacaoRoutes from './routes/variacoes.js';
+import conversaoRoutes from './routes/conversoes.js';
 import { qrCodeService } from './services/qrCodeService.js';
 
 dotenv.config();
@@ -73,6 +79,12 @@ app.get('/', (req, res) => {
 // Rotas da aplicação
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', userRoutes);
+app.use('/api/setores', setorRoutes);
+app.use('/api/categorias', categoriaRoutes);
+app.use('/api/unidades-medida', unidadeMedidaRoutes);
+app.use('/api/produtos', produtoRoutes);
+app.use('/api/variacoes', variacaoRoutes);
+app.use('/api/conversoes', conversaoRoutes);
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {
