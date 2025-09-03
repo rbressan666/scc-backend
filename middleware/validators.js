@@ -37,38 +37,34 @@ export const validateCreateUser = [
     .withMessage('Email deve ser válido')
     .normalizeEmail({ gmail_remove_dots: false }),
   body('senha')
-    .isLength({ min: 8 })
-    .withMessage('Senha deve ter pelo menos 8 caracteres')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial'),
+    .isLength({ min: 6 })
+    .withMessage('Senha deve ter pelo menos 6 caracteres'),
   body('perfil')
-    .isIn(['admin', 'operador'])
-    .withMessage('Perfil deve ser admin ou operador'),
+    .isIn(['admin', 'operador', 'usuario'])
+    .withMessage('Perfil deve ser admin, operador ou usuario'),
   handleValidationErrors
 ];
 
 // Validação para atualização de usuário
 export const validateUpdateUser = [
-  body('nome_completo')
+  body(\'nome_completo\')
     .optional()
     .isLength({ min: 2, max: 100 })
-    .withMessage('Nome completo deve ter entre 2 e 100 caracteres')
+    .withMessage(\'Nome completo deve ter entre 2 e 100 caracteres\')
     .trim(),
-  body('email')
+  body(\'email\')
     .optional()
     .isEmail()
-    .withMessage('Email deve ser válido')
+    .withMessage(\'Email deve ser válido\')
     .normalizeEmail({ gmail_remove_dots: false }),
-  body('senha')
+  body(\'senha\')
     .optional()
-    .isLength({ min: 8 })
-    .withMessage('Senha deve ter pelo menos 8 caracteres')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula, 1 número e 1 caractere especial'),
-  body('perfil')
+    .isLength({ min: 6 })
+    .withMessage(\'Senha deve ter pelo menos 6 caracteres\'),
+  body(\'perfil\')
     .optional()
-    .isIn(['admin', 'operador'])
-    .withMessage('Perfil deve ser admin ou operador'),
+    .isIn([\'admin\', \'operador\', \'usuario\'])
+    .withMessage(\'Perfil deve ser admin, operador ou usuario\'),
   handleValidationErrors
 ];
 
