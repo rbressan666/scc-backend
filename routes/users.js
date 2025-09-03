@@ -7,7 +7,8 @@ import {
   updateUser, 
   deactivateUser,
   reactivateUser,
-  getUserProfile
+  getUserProfile,
+  updateUserProfile
 } from '../controllers/userController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { validateCreateUser, validateUpdateUser } from '../middleware/validators.js';
@@ -19,6 +20,7 @@ router.use(authenticateToken);
 
 // Rota para perfil do usuário logado
 router.get('/profile', getUserProfile);
+router.put('/profile', updateUserProfile);
 
 // Rotas que requerem admin
 router.get('/', requireAdmin, getAllUsers);
