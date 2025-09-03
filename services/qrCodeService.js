@@ -22,29 +22,28 @@ class QRCodeService {
       console.log(`🔌 Cliente conectado: ${socket.id}`);
       
       // Gerar QR Code
-      socket.on('generate-qr', async (callback) => {
+      socket.on('generate-qr', async (data, callback) => {
         try {
           console.log('📱 Solicitação de geração de QR Code recebida');
           const sessionData = this.generateQRSession();
           
-          if (callback && typeof callback === 'function') {
-            callback({
-              success: true,
-              qrCodeData: sessionData.qrCodeData,
-              sessionId: sessionData.sessionId,
-              expiresIn: 5 * 60 * 1000 // 5 minutos em ms
-            });
-          }
+          // Gerar a imagem do QR Code em base64
+          const qrCodeImage = await QRCode.toDataURL(sessionData.qrCodeData);
+
+          // Emitir o evento 'qr-generated' de volta para o cliente que solicitou
+          socket.emit('qr-generated', {
+            qrCodeImage: qrCodeImage,
+            sessionId: sessionData.sessionId,
+            expiresIn: 5 * 60 * 1000 // 5 minutos em ms
+          });
           
           console.log(`📱 QR Code gerado para sessão: ${sessionData.sessionId}`);
         } catch (error) {
           console.error('Erro ao gerar QR Code:', error);
-          if (callback && typeof callback === 'function') {
-            callback({
-              success: false,
-              message: 'Erro ao gerar QR Code'
-            });
-          }
+          // Emitir o evento 'qr-error' em caso de falha
+          socket.emit('qr-error', {
+            message: 'Erro ao gerar QR Code'
+          });
         }
       });
 
@@ -113,9 +112,8 @@ class QRCodeService {
         try {
           const { sessionId } = data;
           this.sessions.delete(sessionId);
-          setShowQRCode(false);
-          setQrStatus('');
-          setError('QR Code expirado. Gere um novo código.');
+          // Removido setShowQRCode e setQrStatus pois são do frontend
+          // setError('QR Code expirado. Gere um novo código.');
         } catch (error) {
           console.error('Erro ao processar QR expirado:', error);
         }
@@ -127,8 +125,7 @@ class QRCodeService {
           const { sessionId } = data;
           if (this.sessions.has(sessionId)) {
             this.sessions.delete(sessionId);
-            setShowQRCode(false);
-            setQrStatus('');
+            // Removido setShowQRCode e setQrStatus pois são do frontend
           }
         } catch (error) {
           console.error('Erro ao cancelar QR:', error);
@@ -352,4 +349,5 @@ class QRCodeService {
 
 // Exportar instância única
 export const qrCodeService = new QRCodeService();
+
 
