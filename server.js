@@ -14,7 +14,7 @@ import { qrCodeService } from './services/qrCodeService.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render.com usa a porta 10000 por padrão
 
 // Criar servidor HTTP
 const server = createServer(app);
@@ -22,7 +22,7 @@ const server = createServer(app);
 // Configurar Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || '*', // Render.com define CORS_ORIGIN
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -32,7 +32,7 @@ const io = new Server(server, {
 // Middlewares
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || '*',
   credentials: true
 }));
 
