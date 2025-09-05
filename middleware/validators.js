@@ -14,6 +14,18 @@ export const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// Validação para código EAN/código de barras
+export const validateEanCode = [
+  body('ean_code')
+    .notEmpty()
+    .withMessage('Código EAN é obrigatório')
+    .isLength({ min: 8, max: 14 })
+    .withMessage('Código EAN deve ter entre 8 e 14 dígitos')
+    .matches(/^\d+$/)
+    .withMessage('Código EAN deve conter apenas números')
+    .trim()
+];
+
 // Validação para login
 export const validateLogin = [
   body('email')

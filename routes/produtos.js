@@ -2,13 +2,16 @@
 import express from 'express';
 import ProdutoController from '../controllers/produtoController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { validateProduto, validateUUID, handleValidationErrors } from '../middleware/validators.js';
+import { validateProduto, validateUUID, validateEanCode, handleValidationErrors } from '../middleware/validators.js';
 
 const router = express.Router();
 
 // Todas as rotas requerem autenticação de admin
 router.use(authenticateToken);
 router.use(requireAdmin);
+
+// POST /api/produtos/lookup-by-ean - Buscar produto por código EAN
+router.post('/lookup-by-ean', validateEanCode, handleValidationErrors, ProdutoController.lookupByEan);
 
 // POST /api/produtos - Criar novo produto
 router.post('/', validateProduto, handleValidationErrors, ProdutoController.create);
