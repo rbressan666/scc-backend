@@ -71,14 +71,14 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       auth: '/api/auth',
-      users: '/api/usuarios'
+      users: '/api/users'  // ← CORRIGIDO: Documentação atualizada
     }
   });
 });
 
 // Rotas da aplicação
 app.use('/api/auth', authRoutes);
-app.use('/api/usuarios', userRoutes);
+app.use('/api/users', userRoutes);  // ← CORRIGIDO: Mudado de /api/usuarios para /api/users
 app.use('/api/setores', setorRoutes);
 app.use('/api/categorias', categoriaRoutes);
 app.use('/api/unidades-medida', unidadeMedidaRoutes);
@@ -104,71 +104,43 @@ app.use('*', (req, res) => {
 });
 
 // Função para testar conexão com banco
-async function testDatabaseConnection() {
+const testDatabaseConnection = async () => {
   try {
     const result = await pool.query('SELECT NOW()');
     console.log('✅ Conexão com banco de dados estabelecida');
     return true;
   } catch (error) {
-    console.error('❌ Erro ao conectar com banco de dados:', error.message);
+    console.error('❌ Falha na conexão com banco de dados:', error.message);
     return false;
   }
-}
+};
 
-// Inicializar servidor
-async function startServer() {
+// Configurar WebSocket para QR Code
+qrCodeService.setupWebSocket(io);
+
+// Função para iniciar o servidor
+const startServer = async () => {
+  console.log('🚀 Iniciando SCC Backend...');
+  
+  // Testar conexão com banco
+  console.log('🔍 Testando conexão com o banco de dados...');
   const dbConnected = await testDatabaseConnection();
   
-  if (dbConnected) {
-    // Inicializar serviço de QR Code com Socket.IO
-    qrCodeService.initialize(io);
-    console.log('🔗 Serviço de QR Code inicializado');
-    
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Servidor rodando com sucesso na porta ${PORT}`);
-      console.log(`🌐 URL: http://localhost:${PORT}`);
-      console.log(`🔌 WebSocket habilitado para QR Code`);
-      console.log(`📱 Endpoints disponíveis:`);
-      console.log(`   - GET  /health`);
-      console.log(`   - POST /api/auth/login`);
-      console.log(`   - POST /api/auth/logout`);
-      console.log(`   - GET  /api/auth/verify`);
-      console.log(`   - GET  /api/usuarios`);
-      console.log(`   - POST /api/usuarios`);
-    });
-  } else {
-    console.error('❌ Falha na conexão com o banco de dados. O servidor não será iniciado.');
+  if (!dbConnected) {
+    console.log('❌ Falha na conexão com o banco de dados');
     process.exit(1);
   }
-}
-
-// Tratamento de sinais do sistema
-process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM recebido. Encerrando servidor...');
-  server.close(() => {
-    console.log('✅ Servidor encerrado graciosamente');
-    process.exit(0);
+  
+  // Iniciar servidor
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Servidor rodando na porta ${PORT}`);
+    console.log(`🌐 Servidor acessível em: http://0.0.0.0:${PORT}`);
+    console.log(`🔗 Health check: http://0.0.0.0:${PORT}/health`);
+    console.log(`📡 WebSocket habilitado para QR Code`);
+    console.log(`🛡️  Rate limiting: ${process.env.RATE_LIMIT_MAX_REQUESTS || 100} requests por ${(parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000) / 60000} minutos`);
   });
-});
+};
 
-process.on('SIGINT', () => {
-  console.log('🛑 SIGINT recebido. Encerrando servidor...');
-  server.close(() => {
-    console.log('✅ Servidor encerrado graciosamente');
-    process.exit(0);
-  });
-});
-
-// Tratamento de erros não capturados
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
-
-// Inicia o servidor
+// Iniciar o servidor
 startServer();
 
