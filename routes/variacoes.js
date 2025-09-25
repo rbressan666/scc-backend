@@ -1,6 +1,6 @@
 // routes/variacoes.js
 import express from 'express';
-import VariacaoController from '../controllers/variacaoController.js';
+import VariacaoProdutoController from '../controllers/variacaoProdutoController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { handleValidationErrors } from '../middleware/validators.js';
 
@@ -11,25 +11,25 @@ router.use(authenticateToken);
 router.use(requireAdmin);
 
 // POST /api/variacoes - Criar nova variação
-router.post('/', handleValidationErrors, VariacaoController.create);
+router.post('/', handleValidationErrors, VariacaoProdutoController.create);
 
 // GET /api/variacoes - Listar todas as variações
-router.get('/', VariacaoController.getAll);
+router.get('/', VariacaoProdutoController.getAll);
 
 // GET /api/variacoes/por-produto/:id - Buscar variações por produto
-router.get('/por-produto/:id', handleValidationErrors, VariacaoController.getByProduto);
+router.get('/por-produto/:id', handleValidationErrors, VariacaoProdutoController.getByProduto);
 
 // GET /api/variacoes/:id - Buscar variação por ID
-router.get('/:id', handleValidationErrors, VariacaoController.getById);
+router.get('/:id', handleValidationErrors, VariacaoProdutoController.getById);
 
 // PUT /api/variacoes/:id - Atualizar variação
-router.put('/:id', handleValidationErrors, VariacaoController.update);
+router.put('/:id', handleValidationErrors, VariacaoProdutoController.update);
 
 // DELETE /api/variacoes/:id - Desativar variação
-router.delete('/:id', handleValidationErrors, VariacaoController.deactivate);
+router.delete('/:id', handleValidationErrors, VariacaoProdutoController.deactivate);
 
 // PUT /api/variacoes/:id/reactivate - Reativar variação
-router.put('/:id/reactivate', handleValidationErrors, VariacaoController.reactivate);
+router.put('/:id/reactivate', handleValidationErrors, VariacaoProdutoController.reactivate);
 
 export default router;
 
