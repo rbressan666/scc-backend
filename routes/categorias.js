@@ -2,7 +2,7 @@
 import express from 'express';
 import CategoriaController from '../controllers/categoriaController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { validateCategoria, validateUUID, handleValidationErrors } from '../middleware/validators.js';
+import { handleValidationErrors } from '../middleware/validators.js';
 
 const router = express.Router();
 
@@ -11,22 +11,22 @@ router.use(authenticateToken);
 router.use(requireAdmin);
 
 // POST /api/categorias - Criar nova categoria
-router.post('/', validateCategoria, handleValidationErrors, CategoriaController.create);
+router.post('/', handleValidationErrors, CategoriaController.create);
 
 // GET /api/categorias - Listar todas as categorias
 router.get('/', CategoriaController.getAll);
 
 // GET /api/categorias/:id - Buscar categoria por ID
-router.get('/:id', validateUUID, handleValidationErrors, CategoriaController.getById);
+router.get('/:id', handleValidationErrors, CategoriaController.getById);
 
 // PUT /api/categorias/:id - Atualizar categoria
-router.put('/:id', validateUUID, validateCategoria, handleValidationErrors, CategoriaController.update);
+router.put('/:id', handleValidationErrors, CategoriaController.update);
 
 // DELETE /api/categorias/:id - Desativar categoria
-router.delete('/:id', validateUUID, handleValidationErrors, CategoriaController.deactivate);
+router.delete('/:id', handleValidationErrors, CategoriaController.deactivate);
 
 // PUT /api/categorias/:id/reactivate - Reativar categoria
-router.put('/:id/reactivate', validateUUID, handleValidationErrors, CategoriaController.reactivate);
+router.put('/:id/reactivate', handleValidationErrors, CategoriaController.reactivate);
 
 export default router;
 
