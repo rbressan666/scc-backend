@@ -17,7 +17,7 @@ router.post('/', handleValidationErrors, VariacaoProdutoController.create);
 router.get('/', VariacaoProdutoController.getAll);
 
 // GET /api/variacoes/por-produto/:id - Buscar variações por produto
-router.get('/por-produto/:id', handleValidationErrors, VariacaoProdutoController.getByProduto);
+router.get('/por-produto/:id', handleValidationErrors, VariacaoProdutoController.getByProduct);
 
 // GET /api/variacoes/:id - Buscar variação por ID
 router.get('/:id', handleValidationErrors, VariacaoProdutoController.getById);
