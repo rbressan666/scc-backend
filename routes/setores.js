@@ -2,7 +2,7 @@
 import express from 'express';
 import SetorController from '../controllers/setorController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { validateSetor, validateUUID, handleValidationErrors } from '../middleware/validators.js';
+import { handleValidationErrors } from '../middleware/validators.js';
 
 const router = express.Router();
 
@@ -11,22 +11,22 @@ router.use(authenticateToken);
 router.use(requireAdmin);
 
 // POST /api/setores - Criar novo setor
-router.post('/', validateSetor, handleValidationErrors, SetorController.create);
+router.post('/', handleValidationErrors, SetorController.create);
 
 // GET /api/setores - Listar todos os setores
 router.get('/', SetorController.getAll);
 
 // GET /api/setores/:id - Buscar setor por ID
-router.get('/:id', validateUUID, handleValidationErrors, SetorController.getById);
+router.get('/:id', handleValidationErrors, SetorController.getById);
 
 // PUT /api/setores/:id - Atualizar setor
-router.put('/:id', validateUUID, validateSetor, handleValidationErrors, SetorController.update);
+router.put('/:id', handleValidationErrors, SetorController.update);
 
 // DELETE /api/setores/:id - Desativar setor
-router.delete('/:id', validateUUID, handleValidationErrors, SetorController.deactivate);
+router.delete('/:id', handleValidationErrors, SetorController.deactivate);
 
 // PUT /api/setores/:id/reactivate - Reativar setor
-router.put('/:id/reactivate', validateUUID, handleValidationErrors, SetorController.reactivate);
+router.put('/:id/reactivate', handleValidationErrors, SetorController.reactivate);
 
 export default router;
 
