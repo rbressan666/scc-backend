@@ -16,7 +16,7 @@ import unidadeMedidaRoutes from './routes/unidades-medida.js';
 import produtoRoutes from './routes/produtos.js';
 import variacaoRoutes from './routes/variacoes.js';
 import fatorConversaoRoutes from './routes/conversoes.js';
-import photoRoutes from './routes/photo.js';
+import photoRoutes from './routes/photos.js';
 
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
@@ -80,7 +80,7 @@ app.use('/api/unidades-medida', unidadeMedidaRoutes);
 app.use('/api/produtos', produtoRoutes);
 app.use('/api/variacoes', variacaoRoutes);
 app.use('/api/conversoes', fatorConversaoRoutes);
-app.use('/api/photo', photoRoutes);
+app.use('/api/photos', photoRoutes);
 
 // Rota de health check
 app.get('/health', (req, res) => {
