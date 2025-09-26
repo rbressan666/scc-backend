@@ -50,3 +50,30 @@
 - Testar login no frontend
 - Verificar comunicação completa entre frontend e backend
 
+
+
+
+## [2025-09-26] - Implementação do Backend do MVP3
+
+### Funcionalidades Adicionadas:
+- **Gestão de Turnos**: Implementados controllers e rotas para criar, listar, buscar, fechar e reabrir turnos.
+- **Gestão de Contagens**: Implementados controllers e rotas para iniciar contagens, adicionar/remover/atualizar itens, e gerenciar o ciclo de vida da contagem (pré-fechamento, fechamento, reabertura).
+- **Sistema de Alertas**: Implementados controllers e rotas para listar, buscar e gerenciar o estado dos alertas (lido, resolvido, ignorado).
+- **Análise de Variação**: Implementados controllers e rotas para geração de análise de variação e relatórios.
+- **Estrutura de Banco de Dados**: Criado o script `mvp3_schema.sql` com todas as tabelas, índices e triggers necessários para o MVP3.
+
+### Arquivos Criados/Modificados:
+- `scc-database/mvp3_schema.sql`: Novo script de banco de dados.
+- `controllers/turnoController.js`: Novo controller para turnos.
+- `controllers/contagemController.js`: Novo controller para contagens.
+- `controllers/alertaController.js`: Novo controller para alertas.
+- `controllers/analiseController.js`: Novo controller para análises.
+- `routes/turnos.js`: Novas rotas para turnos.
+- `routes/contagens.js`: Novas rotas para contagens.
+- `routes/alertas.js`: Novas rotas para alertas.
+- `routes/analise.js`: Novas rotas para análises.
+- `server.js`: Atualizado para incluir as novas rotas do MVP3.
+
+### Próximos Passos:
+- Implementação do frontend para consumir as novas APIs.
+- Testes de integração entre frontend e backend.

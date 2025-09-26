@@ -161,3 +161,17 @@ const startServer = async () => {
 // Inicia o servidor
 startServer();
 
+
+
+// Importar novas rotas do MVP3
+import turnoRoutes from './routes/turnos.js';
+import contagemRoutes from './routes/contagens.js';
+import alertaRoutes from './routes/alertas.js';
+import analiseRoutes from './routes/analise.js';
+
+// Usar novas rotas do MVP3
+app.use('/api/turnos', turnoRoutes);
+app.use('/api/contagens', contagemRoutes);
+app.use('/api/alertas', alertaRoutes);
+app.use('/api/analise', analiseRoutes);
+
