@@ -3,11 +3,11 @@ import {
     generateAnalysis,
     getVariationReport
 } from '../controllers/analiseController.js';
-import { protect, admin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.route('/generate').post(protect, admin, generateAnalysis);
-router.route('/report/turno/:turnoId').get(protect, getVariationReport);
+router.route('/generate').post(authenticateToken, requireAdmin, generateAnalysis);
+router.route('/report/turno/:turnoId').get(authenticateToken, getVariationReport);
 
 export default router;

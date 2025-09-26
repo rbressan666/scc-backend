@@ -10,25 +10,25 @@ import {
     closeContagem,
     reopenContagem
 } from '../controllers/contagemController.js';
-import { protect, admin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.route('/')
-    .post(protect, createContagem);
+    .post(authenticateToken, createContagem);
 
-router.route('/turno/:turnoId').get(protect, getContagensByTurno);
+router.route('/turno/:turnoId').get(authenticateToken, getContagensByTurno);
 
 router.route('/:id/itens')
-    .post(protect, addItemContagem)
-    .get(protect, getItensContagem);
+    .post(authenticateToken, addItemContagem)
+    .get(authenticateToken, getItensContagem);
 
 router.route('/:id/itens/:itemId')
-    .put(protect, updateItemContagem)
-    .delete(protect, removeItemContagem);
+    .put(authenticateToken, updateItemContagem)
+    .delete(authenticateToken, removeItemContagem);
 
-router.route('/:id/pre-close').put(protect, preCloseContagem);
-router.route('/:id/close').put(protect, admin, closeContagem);
-router.route('/:id/reopen').put(protect, admin, reopenContagem);
+router.route('/:id/pre-close').put(authenticateToken, preCloseContagem);
+router.route('/:id/close').put(authenticateToken, requireAdmin, closeContagem);
+router.route('/:id/reopen').put(authenticateToken, requireAdmin, reopenContagem);
 
 export default router;

@@ -6,18 +6,18 @@ import {
     resolveAlerta,
     ignoreAlerta
 } from '../controllers/alertaController.js';
-import { protect, admin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.route('/')
-    .get(protect, getAllAlertas);
+    .get(authenticateToken, getAllAlertas);
 
 router.route('/:id')
-    .get(protect, getAlertaById);
+    .get(authenticateToken, getAlertaById);
 
-router.route('/:id/read').put(protect, markAlertaAsRead);
-router.route('/:id/resolve').put(protect, admin, resolveAlerta);
-router.route('/:id/ignore').put(protect, admin, ignoreAlerta);
+router.route('/:id/read').put(authenticateToken, markAlertaAsRead);
+router.route('/:id/resolve').put(authenticateToken, requireAdmin, resolveAlerta);
+router.route('/:id/ignore').put(authenticateToken, requireAdmin, ignoreAlerta);
 
 export default router;

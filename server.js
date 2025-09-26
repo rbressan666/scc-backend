@@ -17,6 +17,10 @@ import produtoRoutes from './routes/produtos.js';
 import variacaoRoutes from './routes/variacoes.js';
 import fatorConversaoRoutes from './routes/conversoes.js';
 import photoRoutes from './routes/photos.js';
+import turnoRoutes from './routes/turnos.js';
+import contagemRoutes from './routes/contagens.js';
+import alertaRoutes from './routes/alertas.js';
+import analiseRoutes from './routes/analise.js';
 
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
@@ -91,6 +95,10 @@ app.use('/api/produtos', produtoRoutes);
 app.use('/api/variacoes', variacaoRoutes);
 app.use('/api/conversoes', fatorConversaoRoutes);
 app.use('/api/photos', photoRoutes);
+app.use('/api/turnos', turnoRoutes);
+app.use('/api/contagens', contagemRoutes);
+app.use('/api/alertas', alertaRoutes);
+app.use('/api/analise', analiseRoutes);
 
 // Rota de health check
 app.get('/health', (req, res) => {
@@ -163,15 +171,5 @@ startServer();
 
 
 
-// Importar novas rotas do MVP3
-import turnoRoutes from './routes/turnos.js';
-import contagemRoutes from './routes/contagens.js';
-import alertaRoutes from './routes/alertas.js';
-import analiseRoutes from './routes/analise.js';
 
-// Usar novas rotas do MVP3
-app.use('/api/turnos', turnoRoutes);
-app.use('/api/contagens', contagemRoutes);
-app.use('/api/alertas', alertaRoutes);
-app.use('/api/analise', analiseRoutes);
 

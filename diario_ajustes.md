@@ -77,3 +77,30 @@
 ### Próximos Passos:
 - Implementação do frontend para consumir as novas APIs.
 - Testes de integração entre frontend e backend.
+
+
+## [2025-09-26] - Correção do Erro de Deploy do MVP3
+
+### Problema:
+- Erro de deploy no Render: "SyntaxError: The requested module '../middleware/auth.js' does not provide an export named 'admin'"
+- As rotas do MVP3 estavam importando funções de middleware com nomes incorretos
+
+### Causa Raiz:
+- O arquivo `middleware/auth.js` exporta as funções `authenticateToken` e `requireAdmin`
+- As rotas do MVP3 estavam tentando importar `protect` e `admin` que não existem
+
+### Solução Aplicada:
+- Corrigidas todas as importações nas rotas do MVP3:
+  - `protect` → `authenticateToken`
+  - `admin` → `requireAdmin`
+- Arquivos corrigidos:
+  - `routes/turnos.js`
+  - `routes/contagens.js`
+  - `routes/alertas.js`
+  - `routes/analise.js`
+- Corrigido o `server.js` para importar e usar as novas rotas corretamente
+
+### Resultado Esperado:
+- Deploy do backend deve funcionar sem erros
+- Todas as rotas do MVP3 devem estar acessíveis
+- Middleware de autenticação funcionando corretamente
