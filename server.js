@@ -26,17 +26,27 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
+
+// Configuração de CORS para produção e desenvolvimento
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://scc-frontend-z3un.onrender.com',
+  process.env.FRONTEND_URL
+].filter(Boolean); // Remove valores undefined/null
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST"]
   }
 });
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json({ limit: '50mb' }));
@@ -87,7 +97,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    allowedOrigins: allowedOrigins
   });
 });
 
@@ -96,7 +107,8 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'SCC Backend API está funcionando!',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    allowedOrigins: allowedOrigins
   });
 });
 
@@ -136,6 +148,7 @@ const startServer = async () => {
       console.log(`🌐 URL: http://localhost:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🔗 WebSocket habilitado para QR Code`);
+      console.log(`🌍 CORS configurado para:`, allowedOrigins);
     });
     
   } catch (error) {

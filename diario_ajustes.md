@@ -1,31 +1,42 @@
 # Diário de Ajustes - SCC Backend
 
-## [2025-09-25] - Correção do Import de Photos
+## [2025-09-26] - Correção do CORS para Produção
 
 ### Problema:
-- Deploy falhando com erro: `Cannot find module '/app/routes/photo.js'`
-- Server.js tentando importar arquivo com nome incorreto
+- Frontend não consegue se comunicar com o backend
+- Erro CORS: "Access-Control-Allow-Origin header has a value 'http://localhost:3000' that is not equal to the supplied origin"
+- Backend configurado apenas para localhost, mas frontend está em produção
 
 ### Causa Raiz:
-- Inconsistência de nomenclatura entre server.js e arquivo real
-- Server.js importava: `./routes/photo.js` (singular)
-- Arquivo que existe: `./routes/photos.js` (plural)
+- CORS configurado apenas para desenvolvimento (localhost:3000)
+- Variável FRONTEND_URL não definida no Render
+- Frontend em produção: https://scc-frontend-z3un.onrender.com
+- Backend rejeitando requisições cross-origin
 
 ### Solução Aplicada:
-- Corrigido server.js linha 18
-- ANTES: `import photoRoutes from './routes/photo.js';`
-- DEPOIS: `import photoRoutes from './routes/photos.js';`
-- Também corrigido o registro da rota na linha 81
-- ANTES: `app.use('/api/photo', photoRoutes);`
-- DEPOIS: `app.use('/api/photos', photoRoutes);`
+- Configurado array de origens permitidas incluindo:
+  - http://localhost:3000 (desenvolvimento)
+  - https://scc-frontend-z3un.onrender.com (produção)
+  - process.env.FRONTEND_URL (flexibilidade futura)
+- Adicionados métodos HTTP completos no CORS
+- Adicionados headers necessários para autenticação
+- Configurado CORS tanto para Express quanto para Socket.IO
 
 ### Arquivos Modificados:
-- `server.js` - Correção do import e registro da rota
+- `server.js` - Configuração completa de CORS para produção
+
+### Melhorias Implementadas:
+- Array de origens permitidas para múltiplos ambientes
+- Configuração robusta de CORS com todos os métodos HTTP
+- Headers de autorização permitidos
+- Logs de debug mostrando origens configuradas
+- Health check mostra origens permitidas para debug
 
 ### Resultado Esperado:
-- Deploy bem-sucedido
-- Rotas de photos funcionando
-- Sistema MVP 2 completamente operacional
+- Frontend consegue se comunicar com backend
+- Login funcionando
+- Todas as operações CRUD funcionando
+- WebSocket funcionando entre domínios
 
 ### Progresso das Correções:
 ✅ Validators - Correção em lote funcionou
@@ -33,8 +44,9 @@
 ✅ Funções - Nomenclatura alinhada
 ✅ QRCodeService - Método corrigido
 ✅ Photos - Import corrigido
+✅ CORS - Configurado para produção
 
 ### Próximos Passos:
-- Testar deploy
-- Verificar funcionalidade completa do sistema
+- Testar login no frontend
+- Verificar comunicação completa entre frontend e backend
 
