@@ -104,3 +104,35 @@
 - Deploy do backend deve funcionar sem erros
 - Todas as rotas do MVP3 devem estar acessíveis
 - Middleware de autenticação funcionando corretamente
+
+## [2025-09-29] - Correção do Erro 500 na Criação de Turnos
+
+### Problema:
+- Erro 500 ao tentar criar novo turno via frontend
+- Controller não estava tratando adequadamente os dados de entrada
+- Falta de validação e valores padrão
+
+### Causa Raiz:
+- Controller esperava todos os campos obrigatórios do frontend
+- Não havia validação de turno já aberto no backend
+- Formato de resposta inconsistente entre endpoints
+
+### Solução Aplicada:
+- **Validação de turno único**: Verificar se já existe turno aberto antes de criar novo
+- **Valores padrão**: Usar data/hora atual e tipo 'diurno' se não fornecidos
+- **Formato de resposta padronizado**: Todos os endpoints retornam `{success, message, data}`
+- **Tratamento de erros melhorado**: Logs detalhados e mensagens consistentes
+
+### Arquivos Modificados:
+- `controllers/turnoController.js`: Corrigidas todas as funções para usar formato padronizado
+
+### Melhorias Implementadas:
+- Validação de negócio no backend (turno único)
+- Respostas JSON consistentes em todos os endpoints
+- Logs de erro detalhados para debugging
+- Tratamento adequado de casos de erro (404, 400, 500)
+
+### Resultado Esperado:
+- Criação de turnos funcionando corretamente
+- Validação adequada de regras de negócio
+- Mensagens de erro claras para o usuário
