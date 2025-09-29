@@ -136,3 +136,29 @@
 - Criação de turnos funcionando corretamente
 - Validação adequada de regras de negócio
 - Mensagens de erro claras para o usuário
+
+## [2025-09-29] - Correção do Erro "Turno não encontrado"
+
+### Problema:
+- Ao clicar em "Ver Detalhes" de um turno, retorna "Turno não encontrado"
+- Endpoint `/api/turnos/:id` não está retornando dados corretamente
+
+### Causa Raiz:
+- Função `getTurnoById` não estava retornando formato de resposta consistente
+- Possível problema com a tabela `turnos` não existir no banco de dados
+
+### Solução Aplicada:
+- **Formato de resposta padronizado**: `getTurnoById` agora retorna `{success, data}` como os outros endpoints
+- **Tratamento de erro melhorado**: Logs detalhados e mensagens consistentes
+- **Verificação de schema**: Confirmado que o schema da tabela `turnos` está correto
+
+### Arquivos Modificados:
+- `controllers/turnoController.js`: Corrigida função `getTurnoById`
+
+### Próximos Passos:
+- Verificar se a tabela `turnos` foi criada no banco de dados
+- Executar o script `mvp3_schema.sql` se necessário
+- Testar se os turnos estão sendo salvos corretamente
+
+### Observação:
+Se o problema persistir, pode ser necessário executar o script de criação das tabelas do MVP3 no banco de dados de produção.

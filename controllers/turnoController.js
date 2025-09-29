@@ -67,11 +67,22 @@ export const getTurnoById = async (req, res) => {
     try {
         const turno = await pool.query('SELECT * FROM turnos WHERE id = $1', [id]);
         if (turno.rows.length === 0) {
-            return res.status(404).json({ message: 'Turno não encontrado' });
+            return res.status(404).json({ 
+                success: false,
+                message: 'Turno não encontrado' 
+            });
         }
-        res.status(200).json(turno.rows[0]);
+        res.status(200).json({
+            success: true,
+            data: turno.rows[0]
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Erro ao buscar turno por ID:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Erro ao buscar turno',
+            error: error.message 
+        });
     }
 };
 
