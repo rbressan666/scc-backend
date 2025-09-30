@@ -98,16 +98,57 @@ class Produto {
 
   // Atualizar produto
   static async update(id, data) {
-    const { nome, id_categoria, id_setor, ativo } = data;
+    const { nome, id_categoria, id_setor, ativo, imagem_principal_url } = data;
+    
+    // Construir query dinamicamente para incluir apenas campos fornecidos
+    const fields = [];
+    const values = [];
+    let paramIndex = 1;
+    
+    if (nome !== undefined) {
+      fields.push(`nome = $${paramIndex}`);
+      values.push(nome);
+      paramIndex++;
+    }
+    
+    if (id_categoria !== undefined) {
+      fields.push(`id_categoria = $${paramIndex}`);
+      values.push(id_categoria);
+      paramIndex++;
+    }
+    
+    if (id_setor !== undefined) {
+      fields.push(`id_setor = $${paramIndex}`);
+      values.push(id_setor);
+      paramIndex++;
+    }
+    
+    if (ativo !== undefined) {
+      fields.push(`ativo = $${paramIndex}`);
+      values.push(ativo);
+      paramIndex++;
+    }
+    
+    if (imagem_principal_url !== undefined) {
+      fields.push(`imagem_principal_url = $${paramIndex}`);
+      values.push(imagem_principal_url);
+      paramIndex++;
+    }
+    
+    // Sempre atualizar updated_at
+    fields.push('updated_at = NOW()');
+    
+    // Adicionar ID como último parâmetro
+    values.push(id);
     
     const query = `
       UPDATE produtos 
-      SET nome = $1, id_categoria = $2, id_setor = $3, ativo = $4, updated_at = NOW()
-      WHERE id = $5
+      SET ${fields.join(', ')}
+      WHERE id = $${paramIndex}
       RETURNING *
     `;
     
-    const result = await pool.query(query, [nome, id_categoria, id_setor, ativo, id]);
+    const result = await pool.query(query, values);
     return result.rows[0];
   }
 
