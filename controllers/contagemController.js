@@ -5,13 +5,31 @@ export const createContagem = async (req, res) => {
     const usuario_responsavel = req.user.id;
 
     try {
+        // Validar dados obrigatórios
+        if (!turno_id || !tipo_contagem) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Turno ID e tipo de contagem são obrigatórios' 
+            });
+        }
+
         const newContagem = await pool.query(
             'INSERT INTO contagens (turno_id, tipo_contagem, usuario_responsavel) VALUES ($1, $2, $3) RETURNING *',
             [turno_id, tipo_contagem, usuario_responsavel]
         );
-        res.status(201).json(newContagem.rows[0]);
+        
+        res.status(201).json({ 
+            success: true, 
+            message: 'Contagem criada com sucesso',
+            data: newContagem.rows[0] 
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Erro ao criar contagem:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erro interno do servidor',
+            error: error.message 
+        });
     }
 };
 
@@ -59,11 +77,28 @@ export const removeItemContagem = async (req, res) => {
 
 export const getContagensByTurno = async (req, res) => {
     const { turnoId } = req.params;
+    
     try {
+        if (!turnoId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Turno ID é obrigatório' 
+            });
+        }
+
         const contagens = await pool.query('SELECT * FROM contagens WHERE turno_id = $1', [turnoId]);
-        res.status(200).json(contagens.rows);
+        
+        res.status(200).json({ 
+            success: true, 
+            data: contagens.rows 
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Erro ao buscar contagens por turno:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erro interno do servidor',
+            error: error.message 
+        });
     }
 };
 
