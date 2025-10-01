@@ -155,18 +155,52 @@ class UnidadeMedida {
 
   // Verificar se unidade de medida está sendo usada
   static async isInUse(id) {
-    const query = `
-      SELECT COUNT(*) as count 
-      FROM variacoes_produto 
-      WHERE id_unidade_controle = $1
-      UNION ALL
-      SELECT COUNT(*) as count 
-      FROM fatores_conversao 
-      WHERE id_unidade_medida = $1
-    `;
-    const result = await pool.query(query, [id, id]);
-    const totalCount = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
-    return totalCount > 0;
+    console.log('UnidadeMedida.isInUse - Verificando ID:', id);
+    
+    try {
+      // Verificar em variacoes_produto
+      const queryVariacoes = `
+        SELECT COUNT(*) as count 
+        FROM variacoes_produto 
+        WHERE id_unidade_controle = $1
+      `;
+      
+      console.log('UnidadeMedida.isInUse - Query variacoes:', queryVariacoes);
+      const resultVariacoes = await pool.query(queryVariacoes, [id]);
+      const countVariacoes = parseInt(resultVariacoes.rows[0].count) || 0;
+      console.log('UnidadeMedida.isInUse - Count variacoes:', countVariacoes);
+      
+      // Verificar em fatores_conversao
+      const queryFatores = `
+        SELECT COUNT(*) as count 
+        FROM fatores_conversao 
+        WHERE id_unidade_medida = $1
+      `;
+      
+      console.log('UnidadeMedida.isInUse - Query fatores:', queryFatores);
+      const resultFatores = await pool.query(queryFatores, [id]);
+      const countFatores = parseInt(resultFatores.rows[0].count) || 0;
+      console.log('UnidadeMedida.isInUse - Count fatores:', countFatores);
+      
+      const totalCount = countVariacoes + countFatores;
+      const isInUse = totalCount > 0;
+      
+      console.log('UnidadeMedida.isInUse - Total count:', totalCount);
+      console.log('UnidadeMedida.isInUse - Is in use:', isInUse);
+      
+      return isInUse;
+      
+    } catch (error) {
+      console.error('UnidadeMedida.isInUse - Erro:', error);
+      
+      // Se as tabelas não existem, assumir que não está em uso
+      if (error.code === '42P01') { // relation does not exist
+        console.log('UnidadeMedida.isInUse - Tabela não existe, assumindo não está em uso');
+        return false;
+      }
+      
+      throw error;
+    }
   }
 }
 
