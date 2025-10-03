@@ -39,16 +39,47 @@ class Setor {
 
   // Atualizar setor
   static async update(id, data) {
-    const { nome, ativo } = data;
+    console.log('Setor.update - ID:', id);
+    console.log('Setor.update - Data recebida:', data);
+    
+    // Construir query dinamicamente apenas com campos fornecidos
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
+    
+    if (data.nome !== undefined) {
+      fields.push(`nome = $${paramCount}`);
+      values.push(data.nome);
+      paramCount++;
+    }
+    
+    if (data.ativo !== undefined) {
+      fields.push(`ativo = $${paramCount}`);
+      values.push(data.ativo);
+      paramCount++;
+    }
+    
+    // Sempre atualizar updated_at
+    fields.push(`updated_at = NOW()`);
+    
+    if (fields.length === 1) { // Só updated_at
+      throw new Error('Nenhum campo para atualizar');
+    }
     
     const query = `
       UPDATE setores 
-      SET nome = $1, ativo = $2, updated_at = NOW()
-      WHERE id = $3
+      SET ${fields.join(', ')}
+      WHERE id = $${paramCount}
       RETURNING *
     `;
+    values.push(id);
     
-    const result = await pool.query(query, [nome, ativo, id]);
+    console.log('Setor.update - Query:', query);
+    console.log('Setor.update - Values:', values);
+    
+    const result = await pool.query(query, values);
+    console.log('Setor.update - Resultado:', result.rows[0]);
+    
     return result.rows[0];
   }
 
@@ -80,11 +111,25 @@ class Setor {
 
   // Verificar se setor está sendo usado
   static async isInUse(id) {
-    const query = 'SELECT COUNT(*) as count FROM produtos WHERE id_setor = $1';
-    const result = await pool.query(query, [id]);
-    return parseInt(result.rows[0].count) > 0;
+    console.log('Setor.isInUse - Verificando ID:', id);
+    
+    try {
+      const query = 'SELECT COUNT(*) as count FROM produtos WHERE id_setor = $1';
+      console.log('Setor.isInUse - Query:', query);
+      const result = await pool.query(query, [id]);
+      const count = parseInt(result.rows[0].count);
+      console.log('Setor.isInUse - Count:', count);
+      
+      const isInUse = count > 0;
+      console.log('Setor.isInUse - Resultado:', isInUse);
+      
+      return isInUse;
+      
+    } catch (error) {
+      console.error('Setor.isInUse - Erro:', error);
+      throw error;
+    }
   }
 }
 
 export default Setor;
-

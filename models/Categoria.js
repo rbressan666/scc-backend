@@ -86,16 +86,53 @@ class Categoria {
 
   // Atualizar categoria
   static async update(id, data) {
-    const { nome, id_categoria_pai, ativo } = data;
+    console.log('Categoria.update - ID:', id);
+    console.log('Categoria.update - Data recebida:', data);
+    
+    // Construir query dinamicamente apenas com campos fornecidos
+    const fields = [];
+    const values = [];
+    let paramCount = 1;
+    
+    if (data.nome !== undefined) {
+      fields.push(`nome = $${paramCount}`);
+      values.push(data.nome);
+      paramCount++;
+    }
+    
+    if (data.id_categoria_pai !== undefined) {
+      fields.push(`id_categoria_pai = $${paramCount}`);
+      values.push(data.id_categoria_pai);
+      paramCount++;
+    }
+    
+    if (data.ativo !== undefined) {
+      fields.push(`ativo = $${paramCount}`);
+      values.push(data.ativo);
+      paramCount++;
+    }
+    
+    // Sempre atualizar updated_at
+    fields.push(`updated_at = NOW()`);
+    
+    if (fields.length === 1) { // Só updated_at
+      throw new Error('Nenhum campo para atualizar');
+    }
     
     const query = `
       UPDATE categorias 
-      SET nome = $1, id_categoria_pai = $2, ativo = $3, updated_at = NOW()
-      WHERE id = $4
+      SET ${fields.join(', ')}
+      WHERE id = $${paramCount}
       RETURNING *
     `;
+    values.push(id);
     
-    const result = await pool.query(query, [nome, id_categoria_pai || null, ativo, id]);
+    console.log('Categoria.update - Query:', query);
+    console.log('Categoria.update - Values:', values);
+    
+    const result = await pool.query(query, values);
+    console.log('Categoria.update - Resultado:', result.rows[0]);
+    
     return result.rows[0];
   }
 
@@ -127,20 +164,37 @@ class Categoria {
 
   // Verificar se categoria está sendo usada
   static async isInUse(id) {
-    const query = `
-      SELECT COUNT(*) as count 
-      FROM produtos 
-      WHERE id_categoria = $1
-      UNION ALL
-      SELECT COUNT(*) as count 
-      FROM categorias 
-      WHERE id_categoria_pai = $1
-    `;
-    const result = await pool.query(query, [id, id]);
-    const totalCount = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
-    return totalCount > 0;
+    console.log('Categoria.isInUse - Verificando ID:', id);
+    
+    try {
+      // Query 1: Verificar produtos que usam esta categoria
+      const queryProdutos = `SELECT COUNT(*) as count FROM produtos WHERE id_categoria = $1`;
+      console.log('Categoria.isInUse - Query produtos:', queryProdutos);
+      const resultProdutos = await pool.query(queryProdutos, [id]);
+      const countProdutos = parseInt(resultProdutos.rows[0].count);
+      console.log('Categoria.isInUse - Count produtos:', countProdutos);
+      
+      // Query 2: Verificar subcategorias que usam esta categoria como pai
+      const querySubcategorias = `SELECT COUNT(*) as count FROM categorias WHERE id_categoria_pai = $1`;
+      console.log('Categoria.isInUse - Query subcategorias:', querySubcategorias);
+      const resultSubcategorias = await pool.query(querySubcategorias, [id]);
+      const countSubcategorias = parseInt(resultSubcategorias.rows[0].count);
+      console.log('Categoria.isInUse - Count subcategorias:', countSubcategorias);
+      
+      // Total
+      const totalCount = countProdutos + countSubcategorias;
+      console.log('Categoria.isInUse - Total count:', totalCount);
+      
+      const isInUse = totalCount > 0;
+      console.log('Categoria.isInUse - Resultado:', isInUse);
+      
+      return isInUse;
+      
+    } catch (error) {
+      console.error('Categoria.isInUse - Erro:', error);
+      throw error;
+    }
   }
 }
 
 export default Categoria;
-
