@@ -38,14 +38,63 @@ export const addItemContagem = async (req, res) => {
     const { variacao_id, quantidade_contada, unidade_medida_id, quantidade_convertida, observacoes } = req.body;
     const usuario_contador = req.user.id;
 
+    console.log('📝 Adicionando item à contagem:', {
+        contagem_id: id,
+        variacao_id,
+        quantidade_contada,
+        unidade_medida_id,
+        quantidade_convertida,
+        usuario_contador,
+        observacoes
+    });
+
     try {
+        // Validar dados obrigatórios
+        if (!variacao_id || !quantidade_contada || !unidade_medida_id || !quantidade_convertida) {
+            console.log('❌ Dados obrigatórios faltando:', {
+                variacao_id: !!variacao_id,
+                quantidade_contada: !!quantidade_contada,
+                unidade_medida_id: !!unidade_medida_id,
+                quantidade_convertida: !!quantidade_convertida
+            });
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Dados obrigatórios faltando',
+                missing: {
+                    variacao_id: !variacao_id,
+                    quantidade_contada: !quantidade_contada,
+                    unidade_medida_id: !unidade_medida_id,
+                    quantidade_convertida: !quantidade_convertida
+                }
+            });
+        }
+
+        console.log('🔄 Executando INSERT na tabela itens_contagem...');
+        
         const newItem = await pool.query(
             'INSERT INTO itens_contagem (contagem_id, variacao_id, quantidade_contada, unidade_medida_id, quantidade_convertida, usuario_contador, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
             [id, variacao_id, quantidade_contada, unidade_medida_id, quantidade_convertida, usuario_contador, observacoes]
         );
+        
+        console.log('✅ Item criado com sucesso:', newItem.rows[0]);
         res.status(201).json(newItem.rows[0]);
+        
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('❌ Erro ao adicionar item à contagem:', error);
+        console.error('❌ Detalhes do erro:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            constraint: error.constraint
+        });
+        
+        res.status(500).json({ 
+            success: false,
+            message: 'Erro ao adicionar item à contagem',
+            error: error.message,
+            code: error.code,
+            detail: error.detail
+        });
     }
 };
 
@@ -53,14 +102,37 @@ export const updateItemContagem = async (req, res) => {
     const { itemId } = req.params;
     const { quantidade_contada, quantidade_convertida, observacoes } = req.body;
 
+    console.log('🔄 Atualizando item da contagem:', {
+        itemId,
+        quantidade_contada,
+        quantidade_convertida,
+        observacoes
+    });
+
     try {
         const updatedItem = await pool.query(
             'UPDATE itens_contagem SET quantidade_contada = $1, quantidade_convertida = $2, observacoes = $3 WHERE id = $4 RETURNING *',
             [quantidade_contada, quantidade_convertida, observacoes, itemId]
         );
+        
+        if (updatedItem.rows.length === 0) {
+            console.log('⚠️ Item não encontrado para atualização:', itemId);
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Item não encontrado' 
+            });
+        }
+        
+        console.log('✅ Item atualizado com sucesso:', updatedItem.rows[0]);
         res.status(200).json(updatedItem.rows[0]);
+        
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('❌ Erro ao atualizar item da contagem:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Erro ao atualizar item da contagem',
+            error: error.message 
+        });
     }
 };
 
