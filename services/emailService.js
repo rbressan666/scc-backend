@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 import pool from '../config/database.js';
 
 function getBoolean(value, defaultValue = false) {
@@ -24,7 +25,7 @@ function getTransporter() {
   const family = familyEnv === '4' ? 4 : familyEnv === '6' ? 6 : undefined;
 
   if (!host || !user || !pass) {
-    console.warn('[emailService] SMTP não configurado (defina SMTP_HOST, SMTP_USER, SMTP_PASS). Emails serão ignorados.');
+    console.warn('[emailService] SMTP não configurado (defina SMTP_HOST, SMTP_USER, SMTP_PASS). Tentando SendGrid se disponível.');
     return null;
   }
 
@@ -60,11 +61,35 @@ export async function getAdminEmails() {
 }
 
 export async function sendMail({ to, subject, html, text }) {
-  const tx = getTransporter();
-  if (!tx) return { skipped: true };
-
   const fromName = process.env.MAIL_FROM_NAME || 'SCC Notificações';
   const fromEmail = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
+
+  const trySendgrid = async () => {
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (!apiKey) return { skipped: true };
+    try {
+      sgMail.setApiKey(apiKey);
+      const msg = {
+        to: Array.isArray(to) ? to : [to],
+        from: { email: fromEmail, name: fromName },
+        subject,
+        html,
+        text,
+      };
+      if (process.env.EMAIL_DEBUG === 'true') {
+        console.log('[emailService] Enviando via SendGrid API', { to: msg.to, subject: msg.subject });
+      }
+      const resp = await sgMail.send(msg);
+      return { success: true, provider: 'sendgrid', response: Array.isArray(resp) ? resp[0]?.statusCode : undefined };
+    } catch (err) {
+      console.error('[emailService] SendGrid falhou:', err?.message || err);
+      return { success: false, provider: 'sendgrid', error: err?.message || String(err) };
+    }
+  };
+
+  const tx = getTransporter();
+  if (!tx) return await trySendgrid();
+
 
   try {
     const mail = {
@@ -84,10 +109,12 @@ export async function sendMail({ to, subject, html, text }) {
       });
     }
     const info = await tx.sendMail(mail);
-    return { success: true, messageId: info.messageId };
+    return { success: true, provider: 'smtp', messageId: info.messageId };
   } catch (err) {
     console.error('[emailService] Falha ao enviar email:', err?.message || err);
-    return { success: false, error: err?.message || String(err) };
+    const fb = await trySendgrid();
+    if (fb?.success || fb?.skipped) return fb;
+    return { success: false, provider: 'smtp', error: err?.message || String(err) };
   }
 }
 
