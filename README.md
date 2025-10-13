@@ -160,6 +160,29 @@ Como habilitar a tabela no Supabase/Postgres:
 2. Reinicie a API ou faça uma requisição autenticada para gerar registros.
 3. Consulte: `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 50;`
 
+### Notificações por Email (Admins)
+
+O backend pode enviar emails aos administradores em eventos-chave (ex.: login):
+
+- Serviço: `services/emailService.js` (usa Nodemailer)
+- Evento implementado: Notificação de login (`authController.login`)
+
+Configuração SMTP (variáveis de ambiente):
+
+```env
+SMTP_HOST=smtp.seu-provedor.com
+SMTP_PORT=587
+SMTP_USER=seu_usuario
+SMTP_PASS=sua_senha
+SMTP_SECURE=false          # true se usar porta 465
+MAIL_FROM_NAME=SCC Notificações
+MAIL_FROM_EMAIL=nao-responder@suaempresa.com
+```
+
+Observações:
+- Emails são enviados para todos os usuários com `perfil='admin'` e `ativo=true`.
+- Se SMTP não estiver configurado, o envio é ignorado e um aviso é logado.
+
 ## 🚀 Deploy
 
 ### Render.com (Recomendado)

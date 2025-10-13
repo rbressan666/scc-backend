@@ -2,6 +2,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
+import { notifyAdminsOnLogin } from '../services/emailService.js';
 
 export const login = async (req, res) => {
   try {
@@ -93,6 +94,9 @@ export const login = async (req, res) => {
       payload: { email },
       message: 'Login realizado com sucesso'
     };
+
+    // Disparar email para admins de forma não-bloqueante
+    notifyAdminsOnLogin({ user: userResponse, req }).catch(() => {});
 
     res.json({
       success: true,
