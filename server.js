@@ -25,7 +25,7 @@ import analiseRoutes from './routes/analise.js';
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
 import { auditMiddleware } from './middleware/audit.js';
-import { notifyAdminsOnLogin } from './services/emailService.js';
+import { notifyAdminsOnLogin, verifySMTP } from './services/emailService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -115,6 +115,15 @@ if (process.env.ENABLE_TEST_ROUTES === 'true') {
         user: { nome_completo: 'Diagnóstico', email: 'diagnostico@scc.local', perfil: 'tester' },
         req,
       });
+      res.json({ success: true, result });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e?.message || String(e) });
+    }
+  });
+
+  app.get('/api/_test/smtp-verify', async (req, res) => {
+    try {
+      const result = await verifySMTP();
       res.json({ success: true, result });
     } catch (e) {
       res.status(500).json({ success: false, error: e?.message || String(e) });

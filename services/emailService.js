@@ -16,13 +16,30 @@ function getTransporter() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const secure = getBoolean(process.env.SMTP_SECURE, port === 465);
+  const connectionTimeout = parseInt(process.env.SMTP_CONN_TIMEOUT || '15000', 10);
+  const greetingTimeout = parseInt(process.env.SMTP_GREET_TIMEOUT || '15000', 10);
+  const socketTimeout = parseInt(process.env.SMTP_SOCKET_TIMEOUT || '20000', 10);
+  const requireTLS = getBoolean(process.env.SMTP_REQUIRE_TLS, !secure && port === 587);
+  const familyEnv = process.env.SMTP_FAMILY; // '4' para IPv4, '6' para IPv6
+  const family = familyEnv === '4' ? 4 : familyEnv === '6' ? 6 : undefined;
 
   if (!host || !user || !pass) {
     console.warn('[emailService] SMTP não configurado (defina SMTP_HOST, SMTP_USER, SMTP_PASS). Emails serão ignorados.');
     return null;
   }
 
-  transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    requireTLS,
+    connectionTimeout,
+    greetingTimeout,
+    socketTimeout,
+    family,
+    tls: { servername: host, minVersion: 'TLSv1.2' },
+  });
   return transporter;
 }
 
@@ -98,4 +115,24 @@ export async function notifyAdminsOnLogin({ user, req }) {
   const text = `Novo login no SCC\nUsuario: ${user.nome_completo || '-'} (${user.email})\nPerfil: ${user.perfil || '-'}\nData/Hora: ${when}\nIP: ${ip}\nUser-Agent: ${ua}`;
 
   return sendMail({ to, subject, html, text });
+}
+
+export async function verifySMTP() {
+  const tx = getTransporter();
+  if (!tx) return { configured: false, message: 'SMTP não configurado' };
+  try {
+    if (process.env.EMAIL_DEBUG === 'true') {
+      console.log('[emailService] Verificando transporte SMTP...', {
+        host: tx.options.host,
+        port: tx.options.port,
+        secure: tx.options.secure,
+        requireTLS: tx.options.requireTLS,
+      });
+    }
+    const ok = await tx.verify();
+    return { configured: true, reachable: ok === true };
+  } catch (err) {
+    console.error('[emailService] SMTP verify falhou:', err?.message || err);
+    return { configured: true, reachable: false, error: err?.message || String(err) };
+  }
 }
