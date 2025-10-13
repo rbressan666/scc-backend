@@ -83,6 +83,9 @@ export async function sendMail({ to, subject, html, text }) {
       return { success: true, provider: 'sendgrid', response: Array.isArray(resp) ? resp[0]?.statusCode : undefined };
     } catch (err) {
       console.error('[emailService] SendGrid falhou:', err?.message || err);
+      if (err?.response?.body) {
+        console.error('[emailService] SendGrid response body:', JSON.stringify(err.response.body));
+      }
       return { success: false, provider: 'sendgrid', error: err?.message || String(err) };
     }
   };
