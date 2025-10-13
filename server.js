@@ -25,6 +25,7 @@ import analiseRoutes from './routes/analise.js';
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
 import { auditMiddleware } from './middleware/audit.js';
+import { notifyAdminsOnLogin } from './services/emailService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -105,6 +106,21 @@ app.use('/api/turnos', turnoRoutes);
 app.use('/api/contagens', contagemRoutes);
 app.use('/api/alertas', alertaRoutes);
 app.use('/api/analise', analiseRoutes);
+
+// Test endpoint (optional) to verify email sending; enable by setting ENABLE_TEST_ROUTES=true
+if (process.env.ENABLE_TEST_ROUTES === 'true') {
+  app.get('/api/_test/notify-login', async (req, res) => {
+    try {
+      const result = await notifyAdminsOnLogin({
+        user: { nome_completo: 'Diagnóstico', email: 'diagnostico@scc.local', perfil: 'tester' },
+        req,
+      });
+      res.json({ success: true, result });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e?.message || String(e) });
+    }
+  });
+}
 
 // Rota de health check
 app.get('/health', (req, res) => {

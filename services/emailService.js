@@ -31,7 +31,11 @@ export async function getAdminEmails() {
     const result = await pool.query(
       `SELECT email FROM usuarios WHERE perfil = 'admin' AND ativo = true`
     );
-    return result.rows.map(r => r.email).filter(Boolean);
+    const emails = result.rows.map(r => r.email).filter(Boolean);
+    if (process.env.EMAIL_DEBUG === 'true') {
+      console.log('[emailService] Admins encontrados:', emails);
+    }
+    return emails;
   } catch (err) {
     console.error('[emailService] Erro ao buscar emails de admins:', err?.message || err);
     return [];
@@ -46,13 +50,23 @@ export async function sendMail({ to, subject, html, text }) {
   const fromEmail = process.env.MAIL_FROM_EMAIL || process.env.SMTP_USER;
 
   try {
-    const info = await tx.sendMail({
+    const mail = {
       from: `${fromName} <${fromEmail}>`,
       to: Array.isArray(to) ? to.join(',') : to,
       subject,
       html,
       text,
-    });
+    };
+    if (process.env.EMAIL_DEBUG === 'true') {
+      console.log('[emailService] Enviando email via SMTP:', {
+        host: tx.options.host,
+        port: tx.options.port,
+        secure: tx.options.secure,
+        to: mail.to,
+        subject: mail.subject,
+      });
+    }
+    const info = await tx.sendMail(mail);
     return { success: true, messageId: info.messageId };
   } catch (err) {
     console.error('[emailService] Falha ao enviar email:', err?.message || err);
