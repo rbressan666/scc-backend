@@ -143,6 +143,23 @@ O servidor gera logs detalhados incluindo:
 - Erros e exceções
 - Sessões WebSocket
 
+### Auditoria (Audit Log)
+
+Foi adicionada auditoria básica para registrar ações no banco de dados:
+
+- Tabela: `audit_logs`
+- Middleware: `middleware/audit.js` (registra após a resposta)
+- Serviço: `services/auditService.js`
+- Exemplo de metadados em controllers: `controllers/authController.js`
+
+Campos registrados: usuário (quando autenticado), método, path, ação, entidade, ID da entidade, payload (JSON), status HTTP, IP, user agent, sucesso/erro, mensagem e duração.
+
+Como habilitar a tabela no Supabase/Postgres:
+
+1. Execute o script SQL: `scc-database/mvp3_audit_logs.sql` no seu banco.
+2. Reinicie a API ou faça uma requisição autenticada para gerar registros.
+3. Consulte: `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 50;`
+
 ## 🚀 Deploy
 
 ### Render.com (Recomendado)

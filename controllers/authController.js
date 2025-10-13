@@ -85,6 +85,15 @@ export const login = async (req, res) => {
     
     console.log(`✅ Login bem-sucedido para: ${email}`);
     
+    // Metadados de auditoria
+    req.audit = {
+      action: 'login',
+      entity: 'auth',
+      entityId: user.id,
+      payload: { email },
+      message: 'Login realizado com sucesso'
+    };
+
     res.json({
       success: true,
       message: 'Login realizado com sucesso',
@@ -110,6 +119,7 @@ export const login = async (req, res) => {
 
 export const logout = (req, res) => {
   console.log(`🚪 Logout realizado para usuário ID: ${req.user.id}`);
+  req.audit = { action: 'logout', entity: 'auth', entityId: req.user.id };
   res.json({
     success: true,
     message: 'Logout realizado com sucesso'
@@ -207,6 +217,12 @@ export const changePassword = async (req, res) => {
     
     console.log(`🔑 Senha alterada para usuário ID: ${userId}`);
     
+    req.audit = {
+      action: 'change_password',
+      entity: 'user',
+      entityId: userId,
+    };
+
     res.json({
       success: true,
       message: 'Senha alterada com sucesso'

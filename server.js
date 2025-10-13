@@ -24,6 +24,7 @@ import analiseRoutes from './routes/analise.js';
 
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
+import { auditMiddleware } from './middleware/audit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,9 +34,11 @@ const server = createServer(app);
 
 // Configuração de CORS para produção e desenvolvimento
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://scc-frontend-z3un.onrender.com',
-  process.env.FRONTEND_URL
+  'http://localhost:3000', // possível porta do frontend em dev
+  'http://localhost:3001', // porta configurada no Vite (dev) neste projeto
+  'http://localhost:5173', // porta padrão do Vite (fallback)
+  'https://scc-frontend-z3un.onrender.com', // produção
+  process.env.FRONTEND_URL // override via ambiente
 ].filter(Boolean); // Remove valores undefined/null
 
 const io = new Server(server, {
@@ -55,6 +58,9 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Auditoria básica (registra após resposta)
+app.use(auditMiddleware);
 
 // Middleware de logging
 app.use((req, res, next) => {
