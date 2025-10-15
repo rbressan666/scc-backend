@@ -46,3 +46,23 @@ CREATE TABLE IF NOT EXISTS schedule_rules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_schedule_rules_user_dow ON schedule_rules(user_id, day_of_week);
+
+-- Enrich schedule_rules with time range and continuous flag (safe if rerun)
+ALTER TABLE schedule_rules
+  ADD COLUMN IF NOT EXISTS start_time TIME,
+  ADD COLUMN IF NOT EXISTS end_time TIME,
+  ADD COLUMN IF NOT EXISTS continuous BOOLEAN NOT NULL DEFAULT true;
+
+-- One-off scheduled shifts per specific date (week planning instances)
+CREATE TABLE IF NOT EXISTS scheduled_shifts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL,
+  date DATE NOT NULL, -- base day of the shift (start day)
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  spans_next_day BOOLEAN NOT NULL DEFAULT false, -- true if crosses midnight into next day
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_user_date ON scheduled_shifts(user_id, date);
