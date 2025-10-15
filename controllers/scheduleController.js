@@ -1,6 +1,5 @@
 import pool from '../config/database.js';
 import { enqueueNotification } from '../services/notificationsService.js';
-import { enqueueNotification } from '../services/notificationsService.js';
 
 // List schedule rules (optionally by user)
 export async function listRules(req, res) {
@@ -80,61 +79,6 @@ export async function deleteRule(req, res) {
     const { id } = req.params;
     const r = await pool.query(`DELETE FROM schedule_rules WHERE id = $1`, [id]);
     res.json({ ok: true, deleted: r.rowCount });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
-  }
-}
-
-// Generate notifications from rules for a lookahead window
-export async function generatePlannedNotifications(req, res) {
-  try {
-    const lookaheadDays = parseInt(process.env.SCHEDULE_LOOKAHEAD_DAYS || '28', 10);
-    const notifyHourUtc = parseInt(process.env.SCHEDULE_NOTIFY_HOUR_UTC || '12', 10); // 12:00Z
-    const now = new Date();
-    const end = new Date(now.getTime() + lookaheadDays * 24 * 60 * 60 * 1000);
-
-    // Load active rules
-    const { rows: rules } = await pool.query(
-      `SELECT id, user_id, day_of_week, shift_type, start_date, end_date, active
-       FROM schedule_rules WHERE active = true`
-    );
-
-    let enqueued = 0;
-    for (const r of rules) {
-      // Iterate each day in window and match by dow and date range
-      for (let d = new Date(now); d <= end; d = new Date(d.getTime() + 24*60*60*1000)) {
-        const dow = d.getUTCDay(); // 0..6
-        if (dow !== Number(r.day_of_week)) continue;
-
-        const yyyy = d.getUTCFullYear();
-        const mm = String(d.getUTCMonth()+1).padStart(2,'0');
-        const dd = String(d.getUTCDate()).padStart(2,'0');
-        const dayIso = `${yyyy}-${mm}-${dd}`;
-
-        const inRange = (!r.start_date || dayIso >= r.start_date) && (!r.end_date || dayIso <= r.end_date);
-        if (!inRange) continue;
-
-        const scheduledAtUtc = new Date(Date.UTC(yyyy, d.getUTCMonth(), d.getUTCDate(), notifyHourUtc, 0, 0)).toISOString();
-        const subject = `Lembrete de escala (${r.shift_type}) - ${dayIso}`;
-        const text = `Você está planejado para o turno ${r.shift_type} em ${dayIso}.`;
-        const pushPayload = { title: 'Lembrete de escala', body: `Turno ${r.shift_type} em ${dayIso}` };
-        const uniqueKey = `schedule_reminder:${r.user_id}:${r.shift_type}:${dayIso}`;
-
-        const out = await enqueueNotification({
-          userId: r.user_id,
-          type: 'schedule_reminder',
-          scheduledAtUtc,
-          subject,
-          text,
-          html: `<p>${text}</p>`,
-          pushPayload,
-          uniqueKey
-        });
-        if (out.enqueued) enqueued++;
-      }
-    }
-
-    res.json({ ok: true, enqueued, lookaheadDays, notifyHourUtc });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
   }
