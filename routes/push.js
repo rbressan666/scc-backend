@@ -1,6 +1,6 @@
 import express from 'express';
 import { getPublicKey, subscribe, unsubscribe } from '../controllers/pushController.js';
-import auth from '../middleware/auth.js';
+import { authenticateToken as auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
