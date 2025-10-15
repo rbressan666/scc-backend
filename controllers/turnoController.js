@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { enqueueNotification } from '../services/notificationsService.js';
 
 export const createTurno = async (req, res) => {
     try {
@@ -30,6 +31,23 @@ export const createTurno = async (req, res) => {
             [dataTurno, tipoTurno, horarioInicio, usuario_abertura, observacoes, 'aberto']
         );
         
+        // Notificar administradores (e o usuário que abriu) sobre abertura de turno (simplificado)
+        try {
+            const adminUsers = await pool.query("SELECT id, email FROM usuarios WHERE ativo = true AND perfil = 'admin'");
+            const whenUtc = new Date().toISOString();
+            for (const u of adminUsers.rows) {
+                await enqueueNotification({
+                    userId: u.id,
+                    type: 'admin_notice',
+                    scheduledAtUtc: whenUtc,
+                    subject: `Turno aberto (${tipoTurno})`,
+                    html: `<p>O turno ${tipoTurno} foi aberto por ${usuario_abertura} em ${new Date(horarioInicio).toLocaleString()}.</p>`,
+                    text: `Turno ${tipoTurno} aberto.`,
+                    pushPayload: { title: 'Turno aberto', body: `Turno ${tipoTurno} aberto.` }
+                });
+            }
+        } catch (e) { console.error('Falha ao enfileirar admin_notice abertura de turno', e); }
+
         res.status(201).json({
             success: true,
             message: 'Turno criado com sucesso',
@@ -103,6 +121,22 @@ export const closeTurno = async (req, res) => {
                 message: 'Turno não encontrado'
             });
         }
+        // Notificar admins sobre fechamento do turno
+        try {
+            const adminUsers = await pool.query("SELECT id, email FROM usuarios WHERE ativo = true AND perfil = 'admin'");
+            const whenUtc = new Date().toISOString();
+            for (const u of adminUsers.rows) {
+                await enqueueNotification({
+                    userId: u.id,
+                    type: 'admin_notice',
+                    scheduledAtUtc: whenUtc,
+                    subject: `Turno fechado (#${id})`,
+                    html: `<p>O turno #${id} foi fechado por ${usuario_fechamento} em ${new Date().toLocaleString()}.</p>`,
+                    text: `Turno #${id} fechado.`,
+                    pushPayload: { title: 'Turno fechado', body: `Turno #${id} fechado.` }
+                });
+            }
+        } catch (e) { console.error('Falha ao enfileirar admin_notice fechamento de turno', e); }
         
         res.status(200).json({
             success: true,
