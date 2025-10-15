@@ -101,3 +101,31 @@ export async function enqueueTest(req, res) {
     return res.status(500).json({ error: e?.message || 'internal-error' });
   }
 }
+
+export async function listPending(req, res) {
+  try {
+    if (process.env.ENABLE_TEST_ROUTES !== 'true') {
+      return res.status(404).json({ error: 'not-found' });
+    }
+    const { onlyDue = 'true', limit = '10' } = req.query;
+    const onlyDueBool = String(onlyDue).toLowerCase() !== 'false';
+    const lim = Math.max(1, Math.min(parseInt(limit, 10) || 10, 100));
+
+    const whereDue = onlyDueBool ? `AND scheduled_at_utc <= NOW()` : '';
+    const { rows } = await pool.query(
+      `SELECT id, user_id, type, scheduled_at_utc, status, unique_key, last_error
+       FROM notifications_queue
+       WHERE status = 'queued' ${whereDue}
+       ORDER BY scheduled_at_utc ASC
+       LIMIT $1`,
+      [lim]
+    );
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS total, SUM(CASE WHEN scheduled_at_utc <= NOW() THEN 1 ELSE 0 END)::int AS due
+       FROM notifications_queue WHERE status = 'queued'`
+    );
+    return res.json({ ok: true, totalQueued: countRes.rows[0]?.total || 0, dueNow: countRes.rows[0]?.due || 0, sample: rows });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'internal-error' });
+  }
+}
