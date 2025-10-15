@@ -115,3 +115,44 @@ export async function listRules(req, res) {
     res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
   }
 }
+
+// Admin: garante que as tabelas necessárias existam em produção
+export async function bootstrap(req, res) {
+  try {
+    const stmts = [
+      `CREATE TABLE IF NOT EXISTS schedule_rules (
+        id BIGSERIAL PRIMARY KEY,
+        user_id UUID NOT NULL,
+        day_of_week INT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+        shift_type TEXT NOT NULL DEFAULT 'diurno',
+        start_date DATE NOT NULL,
+        end_date DATE NULL,
+        active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_schedule_rules_user_dow ON schedule_rules(user_id, day_of_week);`,
+      `ALTER TABLE schedule_rules
+        ADD COLUMN IF NOT EXISTS start_time TIME,
+        ADD COLUMN IF NOT EXISTS end_time TIME,
+        ADD COLUMN IF NOT EXISTS continuous BOOLEAN NOT NULL DEFAULT true;`,
+      `CREATE TABLE IF NOT EXISTS scheduled_shifts (
+        id BIGSERIAL PRIMARY KEY,
+        user_id UUID NOT NULL,
+        date DATE NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        spans_next_day BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_scheduled_shifts_user_date ON scheduled_shifts(user_id, date);`
+    ];
+    for (const sql of stmts) {
+      await pool.query(sql);
+    }
+    res.json({ ok: true, message: 'Bootstrap concluído' });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
+  }
+}
