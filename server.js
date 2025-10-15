@@ -9,11 +9,11 @@ import pool from './config/database.js';
 
 // Importar rotas
 import authRoutes from './routes/auth.js';
-import userRoutes from './routes/users.js';
-import setorRoutes from './routes/setores.js';
+import notificationsRoutes from './routes/notifications.js';
+import pushRoutes from './routes/push.js';
 import categoriaRoutes from './routes/categorias.js';
 import unidadeMedidaRoutes from './routes/unidades-medida.js';
-import produtoRoutes from './routes/produtos.js';
+app.use('/api/notifications', notificationsRoutes);
 import variacaoRoutes from './routes/variacoes.js';
 import fatorConversaoRoutes from './routes/conversoes.js';
 import photoRoutes from './routes/photos.js';
@@ -22,6 +22,8 @@ import contagemRoutes from './routes/contagens.js';
 import alertaRoutes from './routes/alertas.js';
 import analiseRoutes from './routes/analise.js';
 
+import pushRoutes from './routes/push.js';
+import notificationsRoutes from './routes/notifications.js';
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
 import { auditMiddleware } from './middleware/audit.js';
@@ -31,6 +33,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+app.use('/api/push', pushRoutes);
 const server = createServer(app);
 
 // Configuração de CORS para produção e desenvolvimento
@@ -106,6 +109,7 @@ app.use('/api/turnos', turnoRoutes);
 app.use('/api/contagens', contagemRoutes);
 app.use('/api/alertas', alertaRoutes);
 app.use('/api/analise', analiseRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // Test endpoint (optional) to verify email sending; enable by setting ENABLE_TEST_ROUTES=true
 if (process.env.ENABLE_TEST_ROUTES === 'true') {

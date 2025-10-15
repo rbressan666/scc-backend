@@ -84,6 +84,11 @@ Backend do MVP1 do Sistema Contagem Cadoz (SCC) desenvolvido em Node.js com Expr
 ### Utilitários
 - `GET /health` - Health check do servidor
 - `GET /api` - Informações da API
+ 
+### Web Push (PWA)
+- `GET /api/push/public-key` - Retorna a VAPID public key
+- `POST /api/push/subscribe` - Registra a subscription do usuário logado
+- `POST /api/push/unsubscribe` - Remove/desativa a subscription do usuário
 
 ## 🔐 Autenticação
 
@@ -164,7 +169,7 @@ Como habilitar a tabela no Supabase/Postgres:
 
 O backend pode enviar emails aos administradores em eventos-chave (ex.: login):
 
-- Serviço: `services/emailService.js` (usa Nodemailer)
+- Serviço: `services/emailService.js` (usa Nodemailer e fallback via SendGrid API)
 - Evento implementado: Notificação de login (`authController.login`)
 
 Configuração SMTP (variáveis de ambiente):
@@ -181,7 +186,67 @@ MAIL_FROM_EMAIL=nao-responder@suaempresa.com
 
 Observações:
 - Emails são enviados para todos os usuários com `perfil='admin'` e `ativo=true`.
-- Se SMTP não estiver configurado, o envio é ignorado e um aviso é logado.
+- Se SMTP não estiver configurado ou falhar, será tentado envio via SendGrid se `SENDGRID_API_KEY` estiver definido.
+
+### Web Push (PWA) - Notificações gratuitas
+
+Para habilitar push notifications no navegador/celular:
+
+```env
+VAPID_PUBLIC_KEY=<sua-chave>
+VAPID_PRIVATE_KEY=<sua-chave>
+VAPID_SUBJECT=mailto:seu-email@empresa.com
+```
+
+O frontend deve registrar um Service Worker e solicitar permissão ao usuário. No backend, as inscrições são salvas em `push_subscriptions` e os envios usam VAPID (biblioteca `web-push`).
+
+### Fila de Notificações e Agendador
+
+Tabela: `notifications_queue` (ver `scc-database/mvp3_notifications.sql`).
+
+Worker/Dispatcher:
+- Script: `npm run dispatch-notifications`
+- Lógica: busca notificações `queued` com `scheduled_at_utc <= NOW()` e envia por email e push.
+
+Render (Cron Job):
+- Crie um Cron Job no Render com schedule `* * * * *`
+- Build command: igual ao serviço web
+- Run command: `npm run dispatch-notifications`
+- Configure as mesmas variáveis de ambiente (DB, SendGrid, VAPID)
+
+Alternativa gratuita (HTTP Trigger):
+- Configure uma variável `CRON_DISPATCH_KEY` no backend (valor secreto aleatório)
+- Use um agendador externo gratuito (ex.: cron-job.org ou GitHub Actions) para chamar:
+   - POST `https://<seu-backend>/api/notifications/dispatch`
+   - Header: `x-cron-key: <CRON_DISPATCH_KEY>`
+- O endpoint processa um lote limitado por execução, com locking via banco, evitando duplicidades.
+
+Rotas de teste (somente com ENABLE_TEST_ROUTES=true):
+- `POST /api/notifications/_test/enqueue` body: `{ userId, subject, message, scheduleInSeconds }`
+   - Enfileira uma notificação simples (email + push) para testar o fluxo fim a fim.
+
+Alternativa via SendGrid (recomendada em PaaS que bloqueiam SMTP):
+
+```env
+SENDGRID_API_KEY=SG.xxxxx
+# Opcional: remetente amigável
+MAIL_FROM_NAME=SCC Notificações
+MAIL_FROM_EMAIL=nao-responder@suaempresa.com
+```
+
+Passos no SendGrid:
+- Crie e copie uma API Key com permissões de envio
+- Verifique um remetente (Single Sender) ou autentique seu domínio
+- Use o email verificado em `MAIL_FROM_EMAIL`
+
+Fuso horário dos horários enviados por email:
+
+Por padrão, os horários nos emails são formatados usando a timezone configurada em `APP_TZ` (fallback para `America/Sao_Paulo`). Configure conforme sua localidade:
+
+```env
+# Timezone da aplicação para formatação de datas/horas em emails
+APP_TZ=America/Sao_Paulo
+```
 
 ## 🚀 Deploy
 

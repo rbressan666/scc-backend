@@ -49,7 +49,7 @@ export async function getAdminEmails() {
     const result = await pool.query(
       `SELECT email FROM usuarios WHERE perfil = 'admin' AND ativo = true`
     );
-    const emails = result.rows.map(r => r.email).filter(Boolean);
+    const emails = Array.from(new Set(result.rows.map(r => r.email).filter(Boolean)));
     if (process.env.EMAIL_DEBUG === 'true') {
       console.log('[emailService] Admins encontrados:', emails);
     }
@@ -125,7 +125,13 @@ export async function notifyAdminsOnLogin({ user, req }) {
   const to = await getAdminEmails();
   if (!to.length) return { skipped: true };
 
-  const when = new Date().toLocaleString('pt-BR');
+  // Formatar horário na timezone configurada (padrão: America/Sao_Paulo)
+  const appTz = process.env.APP_TZ || process.env.TIMEZONE || process.env.TZ || 'America/Sao_Paulo';
+  const when = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+    timeZone: appTz,
+  }).format(new Date());
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '-';
   const ua = req.headers['user-agent'] || '-';
 
@@ -135,14 +141,14 @@ export async function notifyAdminsOnLogin({ user, req }) {
       <h2 style="margin:0 0 8px">Novo login no SCC</h2>
       <p><strong>Usuário:</strong> ${user.nome_completo || '-'} (${user.email})</p>
       <p><strong>Perfil:</strong> ${user.perfil || '-'}</p>
-      <p><strong>Data/Hora:</strong> ${when}</p>
+      <p><strong>Data/Hora (${appTz}):</strong> ${when}</p>
       <p><strong>IP:</strong> ${ip}</p>
       <p><strong>User-Agent:</strong> ${ua}</p>
       <hr style="border:none;border-top:1px solid #eee;margin:12px 0"/>
       <p style="color:#666">Este é um email automático de notificação de segurança.</p>
     </div>
   `;
-  const text = `Novo login no SCC\nUsuario: ${user.nome_completo || '-'} (${user.email})\nPerfil: ${user.perfil || '-'}\nData/Hora: ${when}\nIP: ${ip}\nUser-Agent: ${ua}`;
+  const text = `Novo login no SCC\nUsuario: ${user.nome_completo || '-'} (${user.email})\nPerfil: ${user.perfil || '-'}\nData/Hora (${appTz}): ${when}\nIP: ${ip}\nUser-Agent: ${ua}`;
 
   return sendMail({ to, subject, html, text });
 }
