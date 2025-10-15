@@ -23,6 +23,7 @@ import alertaRoutes from './routes/alertas.js';
 import analiseRoutes from './routes/analise.js';
 import pushRoutes from './routes/push.js';
 import notificationsRoutes from './routes/notifications.js';
+import scheduleRoutes from './routes/schedule.js';
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
 import { auditMiddleware } from './middleware/audit.js';
@@ -110,6 +111,7 @@ app.use('/api/turnos', turnoRoutes);
 app.use('/api/contagens', contagemRoutes);
 app.use('/api/alertas', alertaRoutes);
 app.use('/api/analise', analiseRoutes);
+app.use('/api/schedule', scheduleRoutes);
 // notifications routes are already mounted above
 
 // Test endpoint (optional) to verify email sending; enable by setting ENABLE_TEST_ROUTES=true
