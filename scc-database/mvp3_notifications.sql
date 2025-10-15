@@ -1,7 +1,7 @@
 -- Notifications queue
 CREATE TABLE IF NOT EXISTS notifications_queue (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL,
+  user_id UUID NOT NULL,
   occurrence_id BIGINT NULL,
   type TEXT NOT NULL,
   scheduled_at_utc TIMESTAMPTZ NOT NULL,
@@ -21,7 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_queue_status_schedule
 -- Push subscriptions
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL,
+  user_id UUID NOT NULL,
   endpoint TEXT NOT NULL UNIQUE,
   subscription JSONB NOT NULL,
   active BOOLEAN NOT NULL DEFAULT true,

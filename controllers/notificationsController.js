@@ -61,6 +61,7 @@ export async function dispatchNow(req, res) {
         return res.status(500).json({ error: 'transaction-failed', details: err?.message || String(err) });
       } finally {
         // release connection
+        try { client.release(); } catch (_) {}
       }
 
       if (processed >= MAX_BATCH) break;

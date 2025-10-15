@@ -55,7 +55,8 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  // Include custom headers used by our APIs (e.g., x-cron-key for dispatcher)
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-cron-key', 'X-Requested-With', 'Accept']
 }));
 
 app.use(express.json({ limit: '50mb' }));
@@ -109,7 +110,7 @@ app.use('/api/turnos', turnoRoutes);
 app.use('/api/contagens', contagemRoutes);
 app.use('/api/alertas', alertaRoutes);
 app.use('/api/analise', analiseRoutes);
-app.use('/api/notifications', notificationsRoutes);
+// notifications routes are already mounted above
 
 // Test endpoint (optional) to verify email sending; enable by setting ENABLE_TEST_ROUTES=true
 if (process.env.ENABLE_TEST_ROUTES === 'true') {
