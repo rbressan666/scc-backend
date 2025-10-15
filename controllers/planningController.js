@@ -67,6 +67,27 @@ export async function deleteShift(req, res) {
   }
 }
 
+export async function updateShift(req, res) {
+  try {
+    const { id } = req.params;
+    const { startTime, endTime } = req.body || {};
+    if (!startTime && !endTime) return res.status(400).json({ ok: false, error: 'nothing-to-update' });
+    const cur = await pool.query(`SELECT * FROM scheduled_shifts WHERE id = $1`, [id]);
+    if (cur.rowCount === 0) return res.status(404).json({ ok: false, error: 'not-found' });
+    const row = cur.rows[0];
+    const s = startTime || row.start_time;
+    const e = endTime || row.end_time;
+    const spans = e <= s;
+    const upd = await pool.query(
+      `UPDATE scheduled_shifts SET start_time = $2, end_time = $3, spans_next_day = $4, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, s, e, spans]
+    );
+    res.json({ ok: true, shift: upd.rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
+  }
+}
+
 export async function upsertRule(req, res) {
   try {
     const { userId, dayOfWeek, startTime, endTime, continuous = true } = req.body || {};
