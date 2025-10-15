@@ -3,6 +3,7 @@ import { dispatchNotificationRow, enqueueNotification } from '../services/notifi
 
 const MAX_BATCH = parseInt(process.env.NOTIFY_BATCH_SIZE || '20', 10);
 const MAX_RUN_MS = parseInt(process.env.NOTIFY_MAX_RUN_MS || '20000', 10);
+const SKEW_SECONDS = parseInt(process.env.NOTIFY_TIME_SKEW_SEC || '5', 10); // tolerância para diferenças de relógio
 
 export async function dispatchNow(req, res) {
   try {
@@ -22,11 +23,11 @@ export async function dispatchNow(req, res) {
         await client.query('BEGIN');
         const { rows } = await client.query(
           `SELECT * FROM notifications_queue
-           WHERE status = 'queued' AND scheduled_at_utc <= NOW()
+           WHERE status = 'queued' AND scheduled_at_utc <= NOW() + ($2 * INTERVAL '1 second')
            ORDER BY scheduled_at_utc ASC
            FOR UPDATE SKIP LOCKED
            LIMIT $1`,
-          [MAX_BATCH]
+          [MAX_BATCH, SKEW_SECONDS]
         );
         if (rows.length === 0) {
           await client.query('ROLLBACK');
@@ -111,18 +112,20 @@ export async function listPending(req, res) {
     const onlyDueBool = String(onlyDue).toLowerCase() !== 'false';
     const lim = Math.max(1, Math.min(parseInt(limit, 10) || 10, 100));
 
-    const whereDue = onlyDueBool ? `AND scheduled_at_utc <= NOW()` : '';
+    const whereDue = onlyDueBool ? `AND scheduled_at_utc <= NOW() + ($2 * INTERVAL '1 second')` : '';
     const { rows } = await pool.query(
       `SELECT id, user_id, type, scheduled_at_utc, status, unique_key, last_error
        FROM notifications_queue
        WHERE status = 'queued' ${whereDue}
        ORDER BY scheduled_at_utc ASC
        LIMIT $1`,
-      [lim]
+      onlyDueBool ? [lim, SKEW_SECONDS] : [lim]
     );
     const countRes = await pool.query(
-      `SELECT COUNT(*)::int AS total, SUM(CASE WHEN scheduled_at_utc <= NOW() THEN 1 ELSE 0 END)::int AS due
-       FROM notifications_queue WHERE status = 'queued'`
+      `SELECT COUNT(*)::int AS total,
+              SUM(CASE WHEN scheduled_at_utc <= NOW() + ($1 * INTERVAL '1 second') THEN 1 ELSE 0 END)::int AS due
+       FROM notifications_queue WHERE status = 'queued'`,
+      [SKEW_SECONDS]
     );
     return res.json({ ok: true, totalQueued: countRes.rows[0]?.total || 0, dueNow: countRes.rows[0]?.due || 0, sample: rows });
   } catch (e) {
