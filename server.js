@@ -9,11 +9,11 @@ import pool from './config/database.js';
 
 // Importar rotas
 import authRoutes from './routes/auth.js';
-import notificationsRoutes from './routes/notifications.js';
-import pushRoutes from './routes/push.js';
+import userRoutes from './routes/users.js';
+import setorRoutes from './routes/setores.js';
 import categoriaRoutes from './routes/categorias.js';
 import unidadeMedidaRoutes from './routes/unidades-medida.js';
-app.use('/api/notifications', notificationsRoutes);
+import produtoRoutes from './routes/produtos.js';
 import variacaoRoutes from './routes/variacoes.js';
 import fatorConversaoRoutes from './routes/conversoes.js';
 import photoRoutes from './routes/photos.js';
@@ -21,7 +21,6 @@ import turnoRoutes from './routes/turnos.js';
 import contagemRoutes from './routes/contagens.js';
 import alertaRoutes from './routes/alertas.js';
 import analiseRoutes from './routes/analise.js';
-
 import pushRoutes from './routes/push.js';
 import notificationsRoutes from './routes/notifications.js';
 // Importar serviços
@@ -33,7 +32,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-app.use('/api/push', pushRoutes);
 const server = createServer(app);
 
 // Configuração de CORS para produção e desenvolvimento
@@ -96,6 +94,8 @@ const testConnection = async () => {
 };
 
 // Rotas da API
+app.use('/api/push', pushRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/setores', setorRoutes);
