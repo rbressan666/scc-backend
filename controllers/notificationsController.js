@@ -132,3 +132,39 @@ export async function listPending(req, res) {
     return res.status(500).json({ error: e?.message || 'internal-error' });
   }
 }
+
+export async function dumpRecent(req, res) {
+  try {
+    if (process.env.ENABLE_TEST_ROUTES !== 'true') {
+      return res.status(404).json({ error: 'not-found' });
+    }
+    const lim = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 5, 100));
+    const { rows } = await pool.query(
+      `SELECT id, user_id, type, status, scheduled_at_utc, created_at, updated_at, sent_at, unique_key
+       FROM notifications_queue
+       ORDER BY id DESC
+       LIMIT $1`,
+      [lim]
+    );
+    return res.json({ ok: true, rows });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'internal-error' });
+  }
+}
+
+export async function listStats(req, res) {
+  try {
+    if (process.env.ENABLE_TEST_ROUTES !== 'true') {
+      return res.status(404).json({ error: 'not-found' });
+    }
+    const { rows } = await pool.query(
+      `SELECT status, COUNT(*)::int AS count
+       FROM notifications_queue
+       GROUP BY status
+       ORDER BY status`
+    );
+    return res.json({ ok: true, byStatus: rows });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'internal-error' });
+  }
+}
