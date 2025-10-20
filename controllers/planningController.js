@@ -120,10 +120,12 @@ export async function upsertRule(req, res) {
 
 export async function listRules(req, res) {
   try {
-    const { userId } = req.query;
+    const { userId, includeInactive } = req.query;
     const params = [];
-    let where = '';
-    if (userId && userId !== 'all') { where = 'WHERE r.user_id = $1'; params.push(userId); }
+    const conds = [];
+    if (userId && userId !== 'all') { conds.push('r.user_id = $1'); params.push(userId); }
+    if (!includeInactive || includeInactive === 'false') { conds.push('r.active = true'); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     const { rows } = await pool.query(
       `SELECT r.id, r.user_id, u.nome_completo AS user_name, r.day_of_week, r.start_time, r.end_time, r.continuous
        FROM schedule_rules r JOIN usuarios u ON u.id = r.user_id
@@ -132,6 +134,25 @@ export async function listRules(req, res) {
       params
     );
     res.json({ ok: true, rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
+  }
+}
+
+export async function deleteRule(req, res) {
+  try {
+    const { id } = req.params;
+    const { hard } = req.query; // hard=true para excluir fisicamente
+    if (hard === 'true') {
+      const r = await pool.query(`DELETE FROM schedule_rules WHERE id = $1`, [id]);
+      return res.json({ ok: true, deleted: r.rowCount });
+    }
+    const upd = await pool.query(
+      `UPDATE schedule_rules SET active = false, end_date = CURRENT_DATE, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (upd.rowCount === 0) return res.status(404).json({ ok: false, error: 'not-found' });
+    res.json({ ok: true, rule: upd.rows[0] });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
   }

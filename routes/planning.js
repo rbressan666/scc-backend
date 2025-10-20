@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { getWeek, createShift, deleteShift, upsertRule, listRules, bootstrap, updateShift } from '../controllers/planningController.js';
+import { getWeek, createShift, deleteShift, upsertRule, listRules, bootstrap, updateShift, deleteRule } from '../controllers/planningController.js';
 
 const router = express.Router();
 
@@ -11,6 +11,7 @@ router.put('/shifts/:id', updateShift);
 router.delete('/shifts/:id', deleteShift);
 router.post('/rules', upsertRule);
 router.get('/rules', listRules);
+router.delete('/rules/:id', deleteRule);
 router.post('/_bootstrap', bootstrap);
 
 export default router;
