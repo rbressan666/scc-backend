@@ -219,6 +219,33 @@ export async function adminDumpRecent(req, res) {
   }
 }
 
+// Admin: versão detalhada incluindo payload/erros/resultados para diagnóstico
+export async function adminDumpRecentDetails(req, res) {
+  try {
+    const lim = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 20, 200));
+    const { rows } = await pool.query(
+      `SELECT id, user_id, type, status, scheduled_at_utc, created_at, updated_at, sent_at,
+              unique_key, last_error, last_result, payload
+       FROM notifications_queue
+       ORDER BY id DESC
+       LIMIT $1`,
+      [lim]
+    );
+    // Extrair assunto do payload (quando existir)
+    const mapped = rows.map(r => {
+      let subject;
+      try {
+        const p = typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload;
+        subject = p?.subject;
+      } catch (_) {}
+      return { ...r, subject };
+    });
+    return res.json({ ok: true, rows: mapped });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'internal-error' });
+  }
+}
+
 export async function adminListPending(req, res) {
   try {
     const { onlyDue = 'true', limit = '20' } = req.query;
