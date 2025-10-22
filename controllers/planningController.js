@@ -83,6 +83,9 @@ export async function createShift(req, res) {
     const { userId, date, startTime, endTime } = req.body || {};
     if (!userId || !date || !startTime || !endTime) return res.status(400).json({ ok: false, error: 'missing-fields' });
     const spans = endTime <= startTime;
+    if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+      console.info('[planning] createShift', { userId, date, startTime, endTime, spans });
+    }
     const { rows } = await pool.query(
       `INSERT INTO scheduled_shifts(user_id, date, start_time, end_time, spans_next_day)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -111,6 +114,9 @@ export async function createShift(req, res) {
         pushPayload: { title: 'Escala confirmada', body: `${startLabel}–${endLabel} (${dateLabel})` },
         uniqueKey: `shift:${shift.id}:confirm`
       });
+      if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+        console.info('[planning] enqueued schedule_confirm', { shiftId: shift.id });
+      }
 
       const now = new Date();
       // Lembrete 8 horas antes (somente se for futuro)
@@ -127,6 +133,9 @@ export async function createShift(req, res) {
           pushPayload: { title: 'Lembrete (8h)', body: `${startLabel}–${endLabel} (${dateLabel})` },
           uniqueKey: `shift:${shift.id}:rem8h`
         });
+        if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+          console.info('[planning] enqueued schedule_reminder_8h', { shiftId: shift.id });
+        }
       }
 
       // Lembrete 15 minutos antes (somente se for futuro)
@@ -143,6 +152,9 @@ export async function createShift(req, res) {
           pushPayload: { title: 'Lembrete (15m)', body: `${startLabel}–${endLabel} (${dateLabel})` },
           uniqueKey: `shift:${shift.id}:rem15m`
         });
+        if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+          console.info('[planning] enqueued schedule_reminder_15m', { shiftId: shift.id });
+        }
       }
     } catch (notifyErr) {
       console.error('[planning] Falha ao enfileirar notificações do turno:', notifyErr?.message || notifyErr);
@@ -183,6 +195,9 @@ export async function deleteShift(req, res) {
           pushPayload: { title: 'Escala cancelada', body: `${startLabel}–${endLabel} (${dateLabel})` },
           uniqueKey: `shift:${id}:cancel`
         });
+        if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+          console.info('[planning] enqueued schedule_cancel', { shiftId: Number(id) });
+        }
       } catch (notifyErr) {
         console.error('[planning] Falha ao notificar cancelamento do turno:', notifyErr?.message || notifyErr);
       }
@@ -205,6 +220,9 @@ export async function updateShift(req, res) {
     const s = startTime || row.start_time;
     const e = endTime || row.end_time;
     const spans = e <= s;
+    if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+      console.info('[planning] updateShift', { id: Number(id), from: { start: row.start_time, end: row.end_time }, to: { start: s, end: e }, spans });
+    }
     const upd = await pool.query(
       `UPDATE scheduled_shifts SET start_time = $2, end_time = $3, spans_next_day = $4, updated_at = NOW() WHERE id = $1 RETURNING *`,
       [id, s, e, spans]
@@ -239,6 +257,9 @@ export async function updateShift(req, res) {
         pushPayload: { title: 'Escala atualizada', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
         uniqueKey: `shift:${id}:update:${Date.now()}`
       });
+      if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+        console.info('[planning] enqueued schedule_update', { shiftId: Number(id) });
+      }
 
       const now = new Date();
       const at8h = new Date(next.startUtc.getTime() - 8 * 60 * 60 * 1000);
@@ -254,6 +275,9 @@ export async function updateShift(req, res) {
           pushPayload: { title: 'Lembrete (8h)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
           uniqueKey: `shift:${id}:rem8h:${Date.now()}`
         });
+        if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+          console.info('[planning] enqueued schedule_reminder_8h (update)', { shiftId: Number(id) });
+        }
       }
 
       const at15m = new Date(next.startUtc.getTime() - 15 * 60 * 1000);
@@ -269,6 +293,9 @@ export async function updateShift(req, res) {
           pushPayload: { title: 'Lembrete (15m)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
           uniqueKey: `shift:${id}:rem15m:${Date.now()}`
         });
+        if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+          console.info('[planning] enqueued schedule_reminder_15m (update)', { shiftId: Number(id) });
+        }
       }
     } catch (notifyErr) {
       console.error('[planning] Falha ao notificar alteração do turno:', notifyErr?.message || notifyErr);
