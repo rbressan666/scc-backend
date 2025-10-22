@@ -2,7 +2,7 @@ import pool from '../config/database.js';
 import { sendMail } from './emailService.js';
 import { sendPushToUser } from './pushService.js';
 
-// Tipos: schedule_confirm, schedule_reminder_8h, schedule_reminder_15m, schedule_cancel, admin_notice
+// Tipos: schedule_confirm, schedule_reminder_8h, schedule_reminder_15m, schedule_cancel, schedule_update, admin_notice
 
 export async function enqueueNotification({ userId, occurrenceId = null, type, scheduledAtUtc, subject, html, text, pushPayload, uniqueKey }) {
   if (!userId || !type || !scheduledAtUtc) throw new Error('Campos obrigatórios ausentes');

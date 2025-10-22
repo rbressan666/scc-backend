@@ -1,5 +1,41 @@
 import pool from '../config/database.js';
-import { enqueueNotification } from '../services/notificationsService.js';
+import { enqueueNotification, cancelNotificationsForOccurrence } from '../services/notificationsService.js';
+import { zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+
+function ensureSeconds(t) {
+  return t && t.length === 5 ? `${t}:00` : t;
+}
+
+function addDaysISO(dateStr, days) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const d2 = new Date(d.getTime() + days * 86400000);
+  return d2.toISOString().slice(0, 10);
+}
+
+function getAppTz() {
+  return process.env.APP_TZ || process.env.TIMEZONE || process.env.TZ || 'America/Sao_Paulo';
+}
+
+// Converte data+hora no fuso do app para UTC corretamente
+function computeShiftUtc(date, startTime, endTime, spansFlag) {
+  const appTz = getAppTz();
+  const sLocal = `${date}T${ensureSeconds(startTime)}`;
+  const startUtc = zonedTimeToUtc(sLocal, appTz);
+  let endDate = date;
+  if (spansFlag) endDate = addDaysISO(date, 1);
+  const eLocal = `${endDate}T${ensureSeconds(endTime)}`;
+  const endUtc = zonedTimeToUtc(eLocal, appTz);
+  return { startUtc, endUtc, appTz };
+}
+
+function formatShiftRangeHuman(startUtc, endUtc, appTz) {
+  const sameDay = formatInTimeZone(startUtc, appTz, 'yyyy-MM-dd') === formatInTimeZone(endUtc, appTz, 'yyyy-MM-dd');
+  const dateLabel = formatInTimeZone(startUtc, appTz, 'dd/MM/yyyy');
+  const startLabel = formatInTimeZone(startUtc, appTz, 'HH:mm');
+  const endLabel = formatInTimeZone(endUtc, appTz, 'HH:mm');
+  const suffix = sameDay ? '' : ' (termina no dia seguinte)';
+  return { dateLabel, startLabel, endLabel, suffix };
+}
 
 function getWeekWindow(startDateStr) {
   const start = startDateStr ? new Date(startDateStr) : new Date();
@@ -56,16 +92,11 @@ export async function createShift(req, res) {
 
     // Agendar notificações: confirmação imediata, lembrete 8h antes e 15m antes
     try {
-      const appTz = process.env.APP_TZ || process.env.TIMEZONE || process.env.TZ || 'America/Sao_Paulo';
-      const ensureSeconds = (t) => (t && t.length === 5 ? `${t}:00` : t);
-      const startIsoLocal = `${date}T${ensureSeconds(startTime)}`; // interpretado no timezone do processo (defina TZ para precisão)
-      const start = new Date(startIsoLocal);
-      const minus = (ms) => new Date(start.getTime() - ms);
-      const fmt = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: appTz });
-      const humanStart = fmt.format(start);
-
-      const subjectBase = `Escala confirmada - ${humanStart}`;
-      const textBase = `Você foi escalado(a) para trabalhar em ${humanStart}.`;
+      const { startUtc, endUtc, appTz } = computeShiftUtc(date, startTime, endTime, spans);
+      const { dateLabel, startLabel, endLabel, suffix } = formatShiftRangeHuman(startUtc, endUtc, appTz);
+      const rangeCompact = `${dateLabel} ${startLabel}–${endLabel}`;
+      const subjectBase = `Escala confirmada - ${rangeCompact}`;
+      const textBase = `Você foi escalado(a) para ${dateLabel}, das ${startLabel} às ${endLabel}.${suffix ? ' ' + suffix : ''}`;
       const htmlBase = `<p>${textBase}</p>`;
 
       // Confirmação imediata
@@ -77,39 +108,39 @@ export async function createShift(req, res) {
         subject: subjectBase,
         html: htmlBase,
         text: textBase,
-        pushPayload: { title: 'Escala confirmada', body: humanStart },
+        pushPayload: { title: 'Escala confirmada', body: `${startLabel}–${endLabel} (${dateLabel})` },
         uniqueKey: `shift:${shift.id}:confirm`
       });
 
       const now = new Date();
       // Lembrete 8 horas antes (somente se for futuro)
-      const at8h = minus(8 * 60 * 60 * 1000);
+      const at8h = new Date(startUtc.getTime() - 8 * 60 * 60 * 1000);
       if (at8h.getTime() > now.getTime()) {
         await enqueueNotification({
           userId,
           occurrenceId: shift.id,
           type: 'schedule_reminder_8h',
           scheduledAtUtc: at8h.toISOString(),
-          subject: `Lembrete (8h) - ${humanStart}`,
-          html: `<p>Faltam ~8 horas para seu turno: ${humanStart}.</p>`,
-          text: `Faltam ~8 horas para seu turno: ${humanStart}.`,
-          pushPayload: { title: 'Lembrete (8h)', body: humanStart },
+          subject: `Lembrete (8h) - ${rangeCompact}`,
+          html: `<p>Faltam ~8 horas para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.</p>`,
+          text: `Faltam ~8 horas para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.`,
+          pushPayload: { title: 'Lembrete (8h)', body: `${startLabel}–${endLabel} (${dateLabel})` },
           uniqueKey: `shift:${shift.id}:rem8h`
         });
       }
 
       // Lembrete 15 minutos antes (somente se for futuro)
-      const at15m = minus(15 * 60 * 1000);
+      const at15m = new Date(startUtc.getTime() - 15 * 60 * 1000);
       if (at15m.getTime() > now.getTime()) {
         await enqueueNotification({
           userId,
           occurrenceId: shift.id,
           type: 'schedule_reminder_15m',
           scheduledAtUtc: at15m.toISOString(),
-          subject: `Lembrete (15m) - ${humanStart}`,
-          html: `<p>Faltam 15 minutos para seu turno: ${humanStart}.</p>`,
-          text: `Faltam 15 minutos para seu turno: ${humanStart}.`,
-          pushPayload: { title: 'Lembrete (15m)', body: humanStart },
+          subject: `Lembrete (15m) - ${rangeCompact}`,
+          html: `<p>Faltam 15 minutos para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.</p>`,
+          text: `Faltam 15 minutos para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.`,
+          pushPayload: { title: 'Lembrete (15m)', body: `${startLabel}–${endLabel} (${dateLabel})` },
           uniqueKey: `shift:${shift.id}:rem15m`
         });
       }
@@ -127,7 +158,36 @@ export async function createShift(req, res) {
 export async function deleteShift(req, res) {
   try {
     const { id } = req.params;
+    // Buscar dados antes de apagar para notificar
+    const cur = await pool.query(`SELECT * FROM scheduled_shifts WHERE id = $1`, [id]);
+    const exists = cur.rows[0];
     const r = await pool.query(`DELETE FROM scheduled_shifts WHERE id = $1`, [id]);
+
+    if (exists && r.rowCount > 0) {
+      try {
+        await cancelNotificationsForOccurrence(id);
+        const { startUtc, endUtc, appTz } = computeShiftUtc(exists.date.toISOString().slice(0,10), exists.start_time, exists.end_time, exists.spans_next_day);
+        const { dateLabel, startLabel, endLabel, suffix } = formatShiftRangeHuman(startUtc, endUtc, appTz);
+        const rangeCompact = `${dateLabel} ${startLabel}–${endLabel}`;
+        const subject = `Escala cancelada - ${rangeCompact}`;
+        const text = `Sua escala em ${dateLabel}, das ${startLabel} às ${endLabel} foi cancelada.${suffix ? ' ' + suffix : ''}`;
+        const html = `<p>${text}</p>`;
+        await enqueueNotification({
+          userId: exists.user_id,
+          occurrenceId: id,
+          type: 'schedule_cancel',
+          scheduledAtUtc: new Date().toISOString(),
+          subject,
+          html,
+          text,
+          pushPayload: { title: 'Escala cancelada', body: `${startLabel}–${endLabel} (${dateLabel})` },
+          uniqueKey: `shift:${id}:cancel`
+        });
+      } catch (notifyErr) {
+        console.error('[planning] Falha ao notificar cancelamento do turno:', notifyErr?.message || notifyErr);
+      }
+    }
+
     res.json({ ok: true, deleted: r.rowCount });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
@@ -149,7 +209,72 @@ export async function updateShift(req, res) {
       `UPDATE scheduled_shifts SET start_time = $2, end_time = $3, spans_next_day = $4, updated_at = NOW() WHERE id = $1 RETURNING *`,
       [id, s, e, spans]
     );
-    res.json({ ok: true, shift: upd.rows[0] });
+
+    const updated = upd.rows[0];
+
+    // Notificar alteração: cancelar lembretes antigos e agendar novos + email de atualização
+    try {
+      await cancelNotificationsForOccurrence(id);
+
+      const prev = computeShiftUtc(row.date.toISOString().slice(0,10), row.start_time, row.end_time, row.spans_next_day);
+      const prevHuman = formatShiftRangeHuman(prev.startUtc, prev.endUtc, prev.appTz);
+      const next = computeShiftUtc(updated.date.toISOString().slice(0,10), updated.start_time, updated.end_time, updated.spans_next_day);
+      const nextHuman = formatShiftRangeHuman(next.startUtc, next.endUtc, next.appTz);
+
+      const prevRange = `${prevHuman.dateLabel} ${prevHuman.startLabel}–${prevHuman.endLabel}`;
+      const nextRange = `${nextHuman.dateLabel} ${nextHuman.startLabel}–${nextHuman.endLabel}`;
+
+      const subject = `Escala atualizada - ${nextRange}`;
+      const text = `Sua escala foi atualizada de ${prevRange} para ${nextRange}.`;
+      const html = `<p>${text}</p>`;
+
+      await enqueueNotification({
+        userId: updated.user_id,
+        occurrenceId: id,
+        type: 'schedule_update',
+        scheduledAtUtc: new Date().toISOString(),
+        subject,
+        html,
+        text,
+        pushPayload: { title: 'Escala atualizada', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
+        uniqueKey: `shift:${id}:update:${Date.now()}`
+      });
+
+      const now = new Date();
+      const at8h = new Date(next.startUtc.getTime() - 8 * 60 * 60 * 1000);
+      if (at8h.getTime() > now.getTime()) {
+        await enqueueNotification({
+          userId: updated.user_id,
+          occurrenceId: id,
+          type: 'schedule_reminder_8h',
+          scheduledAtUtc: at8h.toISOString(),
+          subject: `Lembrete (8h) - ${nextRange}`,
+          html: `<p>Faltam ~8 horas para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.</p>`,
+          text: `Faltam ~8 horas para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.`,
+          pushPayload: { title: 'Lembrete (8h)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
+          uniqueKey: `shift:${id}:rem8h:${Date.now()}`
+        });
+      }
+
+      const at15m = new Date(next.startUtc.getTime() - 15 * 60 * 1000);
+      if (at15m.getTime() > now.getTime()) {
+        await enqueueNotification({
+          userId: updated.user_id,
+          occurrenceId: id,
+          type: 'schedule_reminder_15m',
+          scheduledAtUtc: at15m.toISOString(),
+          subject: `Lembrete (15m) - ${nextRange}`,
+          html: `<p>Faltam 15 minutos para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.</p>`,
+          text: `Faltam 15 minutos para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.`,
+          pushPayload: { title: 'Lembrete (15m)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
+          uniqueKey: `shift:${id}:rem15m:${Date.now()}`
+        });
+      }
+    } catch (notifyErr) {
+      console.error('[planning] Falha ao notificar alteração do turno:', notifyErr?.message || notifyErr);
+    }
+
+    res.json({ ok: true, shift: updated });
   } catch (e) {
     res.status(500).json({ ok: false, error: e?.message || 'internal-error' });
   }
