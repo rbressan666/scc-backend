@@ -81,33 +81,38 @@ export async function createShift(req, res) {
         uniqueKey: `shift:${shift.id}:confirm`
       });
 
-      // Lembrete 8 horas antes
+      const now = new Date();
+      // Lembrete 8 horas antes (somente se for futuro)
       const at8h = minus(8 * 60 * 60 * 1000);
-      await enqueueNotification({
-        userId,
-        occurrenceId: shift.id,
-        type: 'schedule_reminder_8h',
-        scheduledAtUtc: at8h.toISOString(),
-        subject: `Lembrete (8h) - ${humanStart}`,
-        html: `<p>Faltam ~8 horas para seu turno: ${humanStart}.</p>`,
-        text: `Faltam ~8 horas para seu turno: ${humanStart}.`,
-        pushPayload: { title: 'Lembrete (8h)', body: humanStart },
-        uniqueKey: `shift:${shift.id}:rem8h`
-      });
+      if (at8h.getTime() > now.getTime()) {
+        await enqueueNotification({
+          userId,
+          occurrenceId: shift.id,
+          type: 'schedule_reminder_8h',
+          scheduledAtUtc: at8h.toISOString(),
+          subject: `Lembrete (8h) - ${humanStart}`,
+          html: `<p>Faltam ~8 horas para seu turno: ${humanStart}.</p>`,
+          text: `Faltam ~8 horas para seu turno: ${humanStart}.`,
+          pushPayload: { title: 'Lembrete (8h)', body: humanStart },
+          uniqueKey: `shift:${shift.id}:rem8h`
+        });
+      }
 
-      // Lembrete 15 minutos antes
+      // Lembrete 15 minutos antes (somente se for futuro)
       const at15m = minus(15 * 60 * 1000);
-      await enqueueNotification({
-        userId,
-        occurrenceId: shift.id,
-        type: 'schedule_reminder_15m',
-        scheduledAtUtc: at15m.toISOString(),
-        subject: `Lembrete (15m) - ${humanStart}`,
-        html: `<p>Faltam 15 minutos para seu turno: ${humanStart}.</p>`,
-        text: `Faltam 15 minutos para seu turno: ${humanStart}.`,
-        pushPayload: { title: 'Lembrete (15m)', body: humanStart },
-        uniqueKey: `shift:${shift.id}:rem15m`
-      });
+      if (at15m.getTime() > now.getTime()) {
+        await enqueueNotification({
+          userId,
+          occurrenceId: shift.id,
+          type: 'schedule_reminder_15m',
+          scheduledAtUtc: at15m.toISOString(),
+          subject: `Lembrete (15m) - ${humanStart}`,
+          html: `<p>Faltam 15 minutos para seu turno: ${humanStart}.</p>`,
+          text: `Faltam 15 minutos para seu turno: ${humanStart}.`,
+          pushPayload: { title: 'Lembrete (15m)', body: humanStart },
+          uniqueKey: `shift:${shift.id}:rem15m`
+        });
+      }
     } catch (notifyErr) {
       console.error('[planning] Falha ao enfileirar notificações do turno:', notifyErr?.message || notifyErr);
       // segue sem bloquear a criação do turno
