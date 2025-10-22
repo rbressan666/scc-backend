@@ -9,8 +9,27 @@ export async function dispatchNow(req, res) {
   try {
     const key = process.env.CRON_DISPATCH_KEY;
     if (!key) return res.status(503).json({ error: 'dispatch-key-not-configured' });
-    const provided = req.headers['x-cron-key'] || req.query.key;
-    if (provided !== key) return res.status(401).json({ error: 'unauthorized' });
+    // Accept header or query string and compare trimmed to avoid copy/paste whitespace issues
+    const rawProvided = req.headers['x-cron-key'] ?? req.query.key;
+    const provided = (rawProvided == null)
+      ? ''
+      : (Array.isArray(rawProvided) ? String(rawProvided[0]) : String(rawProvided));
+
+    const expectedTrimmed = String(key).trim();
+    const providedTrimmed = provided.trim();
+
+    if (process.env.LOG_CRON_KEY_DEBUG === 'true') {
+      console.warn('[notifications.dispatch] key check', {
+        hasHeader: typeof req.headers['x-cron-key'] !== 'undefined',
+        hasQuery: typeof req.query.key !== 'undefined',
+        providedLength: provided?.length ?? 0,
+        providedTrimmedLength: providedTrimmed.length,
+      });
+    }
+
+    if (!providedTrimmed || providedTrimmed !== expectedTrimmed) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
 
     const started = Date.now();
     let processed = 0;
