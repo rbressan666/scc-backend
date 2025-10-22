@@ -1,6 +1,6 @@
 import pool from '../config/database.js';
 import { enqueueNotification, cancelNotificationsForOccurrence } from '../services/notificationsService.js';
-import { zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+import * as tz from 'date-fns-tz';
 
 function ensureSeconds(t) {
   return t && t.length === 5 ? `${t}:00` : t;
@@ -20,19 +20,19 @@ function getAppTz() {
 function computeShiftUtc(date, startTime, endTime, spansFlag) {
   const appTz = getAppTz();
   const sLocal = `${date}T${ensureSeconds(startTime)}`;
-  const startUtc = zonedTimeToUtc(sLocal, appTz);
+  const startUtc = tz.zonedTimeToUtc(sLocal, appTz);
   let endDate = date;
   if (spansFlag) endDate = addDaysISO(date, 1);
   const eLocal = `${endDate}T${ensureSeconds(endTime)}`;
-  const endUtc = zonedTimeToUtc(eLocal, appTz);
+  const endUtc = tz.zonedTimeToUtc(eLocal, appTz);
   return { startUtc, endUtc, appTz };
 }
 
 function formatShiftRangeHuman(startUtc, endUtc, appTz) {
-  const sameDay = formatInTimeZone(startUtc, appTz, 'yyyy-MM-dd') === formatInTimeZone(endUtc, appTz, 'yyyy-MM-dd');
-  const dateLabel = formatInTimeZone(startUtc, appTz, 'dd/MM/yyyy');
-  const startLabel = formatInTimeZone(startUtc, appTz, 'HH:mm');
-  const endLabel = formatInTimeZone(endUtc, appTz, 'HH:mm');
+  const sameDay = tz.formatInTimeZone(startUtc, appTz, 'yyyy-MM-dd') === tz.formatInTimeZone(endUtc, appTz, 'yyyy-MM-dd');
+  const dateLabel = tz.formatInTimeZone(startUtc, appTz, 'dd/MM/yyyy');
+  const startLabel = tz.formatInTimeZone(startUtc, appTz, 'HH:mm');
+  const endLabel = tz.formatInTimeZone(endUtc, appTz, 'HH:mm');
   const suffix = sameDay ? '' : ' (termina no dia seguinte)';
   return { dateLabel, startLabel, endLabel, suffix };
 }
