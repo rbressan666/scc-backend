@@ -66,15 +66,16 @@ function getAppTz() {
 // Converte data+hora no fuso do app para UTC corretamente
 function computeShiftUtc(date, startTime, endTime, spansFlag) {
   const appTz = getAppTz();
-  if (!TZ || !TZ.zonedTimeToUtc) {
-    throw new Error('date-fns-tz not initialized (zonedTimeToUtc missing)');
+  const toUtc = TZ && (TZ.zonedTimeToUtc || TZ.fromZonedTime);
+  if (!toUtc) {
+    throw new Error('date-fns-tz not initialized (zonedTimeToUtc/fromZonedTime missing)');
   }
   const sLocal = `${date}T${ensureSeconds(startTime)}`;
-  const startUtc = TZ.zonedTimeToUtc(sLocal, appTz);
+  const startUtc = toUtc(sLocal, appTz);
   let endDate = date;
   if (spansFlag) endDate = addDaysISO(date, 1);
   const eLocal = `${endDate}T${ensureSeconds(endTime)}`;
-  const endUtc = TZ.zonedTimeToUtc(eLocal, appTz);
+  const endUtc = toUtc(eLocal, appTz);
   return { startUtc, endUtc, appTz };
 }
 
