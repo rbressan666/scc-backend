@@ -2,29 +2,51 @@ import pool from '../config/database.js';
 import { enqueueNotification, cancelNotificationsForOccurrence } from '../services/notificationsService.js';
 import { createRequire } from 'module';
 
-// Robust date-fns-tz interop across ESM/CJS/bundlers
+// Robust date-fns-tz interop across ESM/CJS/bundlers + debug logging
 let TZ = null;
+let _tzDebug = {};
+
 try {
   const require = createRequire(import.meta.url);
-  const mod = require('date-fns-tz');
-  TZ = (mod && (mod.zonedTimeToUtc || mod.formatInTimeZone))
-    ? mod
-    : (mod && mod.default && (mod.default.zonedTimeToUtc || mod.default.formatInTimeZone))
-      ? mod.default
+  const cjs = require('date-fns-tz');
+  _tzDebug.cjs_typeof = typeof cjs;
+  _tzDebug.cjs_keys = cjs ? Object.keys(cjs) : null;
+  _tzDebug.cjs_default_typeof = cjs?.default ? typeof cjs.default : null;
+  _tzDebug.cjs_default_keys = cjs?.default ? Object.keys(cjs.default) : null;
+
+  TZ = (cjs && (cjs.zonedTimeToUtc || cjs.formatInTimeZone))
+    ? cjs
+    : (cjs && cjs.default && (cjs.default.zonedTimeToUtc || cjs.default.formatInTimeZone))
+      ? cjs.default
       : null;
 } catch (e) {
-  // Último recurso: import dinâmico (Node 18+ suporta TLA)
+  _tzDebug.cjs_error = e?.message || String(e);
 }
 
 if (!TZ) {
   try {
-    const mod = await import('date-fns-tz');
-    TZ = (mod && (mod.zonedTimeToUtc || mod.formatInTimeZone))
-      ? mod
-      : (mod && mod.default && (mod.default.zonedTimeToUtc || mod.default.formatInTimeZone))
-        ? mod.default
+    const esm = await import('date-fns-tz');
+    _tzDebug.esm_typeof = typeof esm;
+    _tzDebug.esm_keys = esm ? Object.keys(esm) : null;
+    _tzDebug.esm_default_typeof = esm?.default ? typeof esm.default : null;
+    _tzDebug.esm_default_keys = esm?.default ? Object.keys(esm.default) : null;
+
+    TZ = (esm && (esm.zonedTimeToUtc || esm.formatInTimeZone))
+      ? esm
+      : (esm && esm.default && (esm.default.zonedTimeToUtc || esm.default.formatInTimeZone))
+        ? esm.default
         : null;
-  } catch {}
+  } catch (e) {
+    _tzDebug.esm_error = e?.message || String(e);
+  }
+}
+
+if (process.env.LOG_TZ_DEBUG === 'true' || process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+  console.info('[planning][date-fns-tz] resolution debug', _tzDebug, {
+    resolved: !!TZ,
+    has_zonedTimeToUtc: !!(TZ && TZ.zonedTimeToUtc),
+    has_formatInTimeZone: !!(TZ && TZ.formatInTimeZone)
+  });
 }
 
 function ensureSeconds(t) {
