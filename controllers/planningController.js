@@ -1,13 +1,31 @@
 import pool from '../config/database.js';
 import { enqueueNotification, cancelNotificationsForOccurrence } from '../services/notificationsService.js';
-import * as tz from 'date-fns-tz';
-// date-fns-tz interop: in some runtimes the functions live under default
-// Normalize a stable accessor to avoid "is not a function" at runtime
-const TZ = (tz && typeof tz === 'object' && (tz.zonedTimeToUtc || tz.formatInTimeZone))
-  ? tz
-  : (tz && tz.default && (tz.default.zonedTimeToUtc || tz.default.formatInTimeZone))
-    ? tz.default
-    : null;
+import { createRequire } from 'module';
+
+// Robust date-fns-tz interop across ESM/CJS/bundlers
+let TZ = null;
+try {
+  const require = createRequire(import.meta.url);
+  const mod = require('date-fns-tz');
+  TZ = (mod && (mod.zonedTimeToUtc || mod.formatInTimeZone))
+    ? mod
+    : (mod && mod.default && (mod.default.zonedTimeToUtc || mod.default.formatInTimeZone))
+      ? mod.default
+      : null;
+} catch (e) {
+  // Último recurso: import dinâmico (Node 18+ suporta TLA)
+}
+
+if (!TZ) {
+  try {
+    const mod = await import('date-fns-tz');
+    TZ = (mod && (mod.zonedTimeToUtc || mod.formatInTimeZone))
+      ? mod
+      : (mod && mod.default && (mod.default.zonedTimeToUtc || mod.default.formatInTimeZone))
+        ? mod.default
+        : null;
+  } catch {}
+}
 
 function ensureSeconds(t) {
   return t && t.length === 5 ? `${t}:00` : t;
