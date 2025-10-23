@@ -8,6 +8,12 @@ export async function enqueueNotification({ userId, occurrenceId = null, type, s
   if (!userId || !type || !scheduledAtUtc) throw new Error('Campos obrigatórios ausentes');
   const key = uniqueKey || `${type}:${userId}:${occurrenceId || 'none'}:${new Date(scheduledAtUtc).getTime()}`;
   const payload = { subject, html, text, pushPayload };
+  // INSERT real em notifications_queue acontece nesta query abaixo
+  // Chamado por controllers de planejamento (createShift/updateShift/deleteShift) para enfileirar:
+  // - schedule_confirm (imediato)
+  // - schedule_cancel (imediato)
+  // - schedule_update (imediato)
+  // - schedule_reminder_8h e schedule_reminder_15m (futuros)
   const r = await pool.query(
     `INSERT INTO notifications_queue(user_id, occurrence_id, type, scheduled_at_utc, payload, unique_key, status)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'queued')

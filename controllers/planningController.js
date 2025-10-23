@@ -1,6 +1,13 @@
 import pool from '../config/database.js';
 import { enqueueNotification, cancelNotificationsForOccurrence } from '../services/notificationsService.js';
 import * as tz from 'date-fns-tz';
+// date-fns-tz interop: in some runtimes the functions live under default
+// Normalize a stable accessor to avoid "is not a function" at runtime
+const TZ = (tz && typeof tz === 'object' && (tz.zonedTimeToUtc || tz.formatInTimeZone))
+  ? tz
+  : (tz && tz.default && (tz.default.zonedTimeToUtc || tz.default.formatInTimeZone))
+    ? tz.default
+    : null;
 
 function ensureSeconds(t) {
   return t && t.length === 5 ? `${t}:00` : t;
@@ -19,20 +26,26 @@ function getAppTz() {
 // Converte data+hora no fuso do app para UTC corretamente
 function computeShiftUtc(date, startTime, endTime, spansFlag) {
   const appTz = getAppTz();
+  if (!TZ || !TZ.zonedTimeToUtc) {
+    throw new Error('date-fns-tz not initialized (zonedTimeToUtc missing)');
+  }
   const sLocal = `${date}T${ensureSeconds(startTime)}`;
-  const startUtc = tz.zonedTimeToUtc(sLocal, appTz);
+  const startUtc = TZ.zonedTimeToUtc(sLocal, appTz);
   let endDate = date;
   if (spansFlag) endDate = addDaysISO(date, 1);
   const eLocal = `${endDate}T${ensureSeconds(endTime)}`;
-  const endUtc = tz.zonedTimeToUtc(eLocal, appTz);
+  const endUtc = TZ.zonedTimeToUtc(eLocal, appTz);
   return { startUtc, endUtc, appTz };
 }
 
 function formatShiftRangeHuman(startUtc, endUtc, appTz) {
-  const sameDay = tz.formatInTimeZone(startUtc, appTz, 'yyyy-MM-dd') === tz.formatInTimeZone(endUtc, appTz, 'yyyy-MM-dd');
-  const dateLabel = tz.formatInTimeZone(startUtc, appTz, 'dd/MM/yyyy');
-  const startLabel = tz.formatInTimeZone(startUtc, appTz, 'HH:mm');
-  const endLabel = tz.formatInTimeZone(endUtc, appTz, 'HH:mm');
+  if (!TZ || !TZ.formatInTimeZone) {
+    throw new Error('date-fns-tz not initialized (formatInTimeZone missing)');
+  }
+  const sameDay = TZ.formatInTimeZone(startUtc, appTz, 'yyyy-MM-dd') === TZ.formatInTimeZone(endUtc, appTz, 'yyyy-MM-dd');
+  const dateLabel = TZ.formatInTimeZone(startUtc, appTz, 'dd/MM/yyyy');
+  const startLabel = TZ.formatInTimeZone(startUtc, appTz, 'HH:mm');
+  const endLabel = TZ.formatInTimeZone(endUtc, appTz, 'HH:mm');
   const suffix = sameDay ? '' : ' (termina no dia seguinte)';
   return { dateLabel, startLabel, endLabel, suffix };
 }
@@ -93,7 +106,7 @@ export async function createShift(req, res) {
     );
     const shift = rows[0];
 
-    // Agendar notificações: confirmação imediata, lembrete 8h antes e 15m antes
+  // Agendar notificações: confirmação imediata, lembrete 8h antes e 15m antes
     try {
       const { startUtc, endUtc, appTz } = computeShiftUtc(date, startTime, endTime, spans);
       const { dateLabel, startLabel, endLabel, suffix } = formatShiftRangeHuman(startUtc, endUtc, appTz);
@@ -102,7 +115,7 @@ export async function createShift(req, res) {
       const textBase = `Você foi escalado(a) para ${dateLabel}, das ${startLabel} às ${endLabel}.${suffix ? ' ' + suffix : ''}`;
       const htmlBase = `<p>${textBase}</p>`;
 
-      // Confirmação imediata
+      // INSERT em notifications_queue (schedule_confirm imediato)
       const createdAtMs = shift.created_at ? new Date(shift.created_at).getTime() : Date.now();
       const rConfirm = await enqueueNotification({
         userId,
@@ -119,7 +132,7 @@ export async function createShift(req, res) {
       }
 
       const now = new Date();
-      // Lembrete 8 horas antes (somente se for futuro)
+      // INSERT em notifications_queue (schedule_reminder_8h) — somente se estiver no futuro
       const at8h = new Date(startUtc.getTime() - 8 * 60 * 60 * 1000);
       if (at8h.getTime() > now.getTime()) {
         const r8h = await enqueueNotification({
@@ -137,7 +150,7 @@ export async function createShift(req, res) {
         }
       }
 
-      // Lembrete 15 minutos antes (somente se for futuro)
+      // INSERT em notifications_queue (schedule_reminder_15m) — somente se estiver no futuro
       const at15m = new Date(startUtc.getTime() - 15 * 60 * 1000);
       if (at15m.getTime() > now.getTime()) {
         const r15 = await enqueueNotification({
@@ -183,6 +196,7 @@ export async function deleteShift(req, res) {
         const text = `Sua escala em ${dateLabel}, das ${startLabel} às ${endLabel} foi cancelada.${suffix ? ' ' + suffix : ''}`;
         const html = `<p>${text}</p>`;
         const cancelCreatedAtMs = exists.created_at ? new Date(exists.created_at).getTime() : Date.now();
+        // INSERT em notifications_queue (schedule_cancel imediato) após excluir a escala
         const rCancel = await enqueueNotification({
           userId: exists.user_id,
           occurrenceId: id,
@@ -244,6 +258,7 @@ export async function updateShift(req, res) {
       const text = `Sua escala foi atualizada de ${prevRange} para ${nextRange}.`;
       const html = `<p>${text}</p>`;
 
+      // INSERT em notifications_queue (schedule_update imediato) após alterar a escala
       await enqueueNotification({
         userId: updated.user_id,
         occurrenceId: id,
@@ -261,6 +276,7 @@ export async function updateShift(req, res) {
       const now = new Date();
       const at8h = new Date(next.startUtc.getTime() - 8 * 60 * 60 * 1000);
       if (at8h.getTime() > now.getTime()) {
+        // INSERT em notifications_queue (lembrete 8h para o novo horário)
         await enqueueNotification({
           userId: updated.user_id,
           occurrenceId: id,
@@ -278,6 +294,7 @@ export async function updateShift(req, res) {
 
       const at15m = new Date(next.startUtc.getTime() - 15 * 60 * 1000);
       if (at15m.getTime() > now.getTime()) {
+        // INSERT em notifications_queue (lembrete 15m para o novo horário)
         await enqueueNotification({
           userId: updated.user_id,
           occurrenceId: id,
