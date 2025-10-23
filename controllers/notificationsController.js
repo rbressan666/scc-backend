@@ -273,3 +273,20 @@ export async function adminListPending(req, res) {
     return res.status(500).json({ error: e?.message || 'internal-error' });
   }
 }
+
+// Admin: listar notificações por ocorrência (shift) para diagnóstico rápido
+export async function adminListByOccurrence(req, res) {
+  try {
+    const { id } = req.params; // occurrence id (e.g., shift id)
+    const { rows } = await pool.query(
+      `SELECT id, user_id, occurrence_id, type, status, scheduled_at_utc, unique_key, last_error, last_result, created_at
+       FROM notifications_queue
+       WHERE occurrence_id = $1
+       ORDER BY id DESC`,
+      [id]
+    );
+    return res.json({ ok: true, rows });
+  } catch (e) {
+    return res.status(500).json({ error: e?.message || 'internal-error' });
+  }
+}

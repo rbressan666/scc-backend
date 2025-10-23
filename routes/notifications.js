@@ -1,5 +1,5 @@
 import express from 'express';
-import { dispatchNow, enqueueTest, listPending, dumpRecent, listStats, adminListStats, adminDumpRecent, adminListPending, adminDumpRecentDetails } from '../controllers/notificationsController.js';
+import { dispatchNow, enqueueTest, listPending, dumpRecent, listStats, adminListStats, adminDumpRecent, adminListPending, adminDumpRecentDetails, adminListByOccurrence } from '../controllers/notificationsController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -17,6 +17,7 @@ router.get('/_test/stats', listStats);
 router.get('/admin/stats', authenticateToken, requireAdmin, adminListStats);
 router.get('/admin/recent', authenticateToken, requireAdmin, adminDumpRecent);
 router.get('/admin/recent-details', authenticateToken, requireAdmin, adminDumpRecentDetails);
+router.get('/admin/by-occurrence/:id', authenticateToken, requireAdmin, adminListByOccurrence);
 router.get('/admin/pending', authenticateToken, requireAdmin, adminListPending);
 
 export default router;
