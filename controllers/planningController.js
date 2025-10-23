@@ -103,7 +103,8 @@ export async function createShift(req, res) {
       const htmlBase = `<p>${textBase}</p>`;
 
       // Confirmação imediata
-      await enqueueNotification({
+      const createdAtMs = shift.created_at ? new Date(shift.created_at).getTime() : Date.now();
+      const rConfirm = await enqueueNotification({
         userId,
         occurrenceId: shift.id,
         type: 'schedule_confirm',
@@ -112,17 +113,17 @@ export async function createShift(req, res) {
         html: htmlBase,
         text: textBase,
         pushPayload: { title: 'Escala confirmada', body: `${startLabel}–${endLabel} (${dateLabel})` },
-        uniqueKey: `shift:${shift.id}:confirm`
+        uniqueKey: `shift:${shift.id}:confirm:${createdAtMs}`
       });
       if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
-        console.info('[planning] enqueued schedule_confirm', { shiftId: shift.id });
+        console.info('[planning] enqueued schedule_confirm', { shiftId: shift.id, enqueued: rConfirm?.enqueued, id: rConfirm?.id });
       }
 
       const now = new Date();
       // Lembrete 8 horas antes (somente se for futuro)
       const at8h = new Date(startUtc.getTime() - 8 * 60 * 60 * 1000);
       if (at8h.getTime() > now.getTime()) {
-        await enqueueNotification({
+        const r8h = await enqueueNotification({
           userId,
           occurrenceId: shift.id,
           type: 'schedule_reminder_8h',
@@ -131,17 +132,17 @@ export async function createShift(req, res) {
           html: `<p>Faltam ~8 horas para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.</p>`,
           text: `Faltam ~8 horas para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.`,
           pushPayload: { title: 'Lembrete (8h)', body: `${startLabel}–${endLabel} (${dateLabel})` },
-          uniqueKey: `shift:${shift.id}:rem8h`
+          uniqueKey: `shift:${shift.id}:rem8h:${createdAtMs}`
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
-          console.info('[planning] enqueued schedule_reminder_8h', { shiftId: shift.id });
+          console.info('[planning] enqueued schedule_reminder_8h', { shiftId: shift.id, enqueued: r8h?.enqueued, id: r8h?.id });
         }
       }
 
       // Lembrete 15 minutos antes (somente se for futuro)
       const at15m = new Date(startUtc.getTime() - 15 * 60 * 1000);
       if (at15m.getTime() > now.getTime()) {
-        await enqueueNotification({
+        const r15 = await enqueueNotification({
           userId,
           occurrenceId: shift.id,
           type: 'schedule_reminder_15m',
@@ -150,10 +151,10 @@ export async function createShift(req, res) {
           html: `<p>Faltam 15 minutos para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.</p>`,
           text: `Faltam 15 minutos para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.`,
           pushPayload: { title: 'Lembrete (15m)', body: `${startLabel}–${endLabel} (${dateLabel})` },
-          uniqueKey: `shift:${shift.id}:rem15m`
+          uniqueKey: `shift:${shift.id}:rem15m:${createdAtMs}`
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
-          console.info('[planning] enqueued schedule_reminder_15m', { shiftId: shift.id });
+          console.info('[planning] enqueued schedule_reminder_15m', { shiftId: shift.id, enqueued: r15?.enqueued, id: r15?.id });
         }
       }
     } catch (notifyErr) {
@@ -184,7 +185,8 @@ export async function deleteShift(req, res) {
         const subject = `Escala cancelada - ${rangeCompact}`;
         const text = `Sua escala em ${dateLabel}, das ${startLabel} às ${endLabel} foi cancelada.${suffix ? ' ' + suffix : ''}`;
         const html = `<p>${text}</p>`;
-        await enqueueNotification({
+        const cancelCreatedAtMs = exists.created_at ? new Date(exists.created_at).getTime() : Date.now();
+        const rCancel = await enqueueNotification({
           userId: exists.user_id,
           occurrenceId: id,
           type: 'schedule_cancel',
@@ -193,10 +195,10 @@ export async function deleteShift(req, res) {
           html,
           text,
           pushPayload: { title: 'Escala cancelada', body: `${startLabel}–${endLabel} (${dateLabel})` },
-          uniqueKey: `shift:${id}:cancel`
+          uniqueKey: `shift:${id}:cancel:${cancelCreatedAtMs}`
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
-          console.info('[planning] enqueued schedule_cancel', { shiftId: Number(id) });
+          console.info('[planning] enqueued schedule_cancel', { shiftId: Number(id), enqueued: rCancel?.enqueued, id: rCancel?.id });
         }
       } catch (notifyErr) {
         console.error('[planning] Falha ao notificar cancelamento do turno:', notifyErr?.message || notifyErr);
