@@ -53,6 +53,19 @@ function ensureSeconds(t) {
   return t && t.length === 5 ? `${t}:00` : t;
 }
 
+function hhmm(t) {
+  if (!t) return t;
+  // Accepts 'HH:mm' or 'HH:mm:ss' and returns 'HH:mm'
+  return t.length >= 5 ? t.slice(0,5) : t;
+}
+
+function formatDateBR(isoDate) {
+  // isoDate: 'YYYY-MM-DD'
+  if (!isoDate || isoDate.length < 10) return isoDate;
+  const [y,m,d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 function addDaysISO(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00Z`);
   const d2 = new Date(d.getTime() + days * 86400000);
@@ -76,7 +89,7 @@ function computeShiftUtc(date, startTime, endTime, spansFlag) {
   if (spansFlag) endDate = addDaysISO(date, 1);
   const eLocal = `${endDate}T${ensureSeconds(endTime)}`;
   const endUtc = toUtc(eLocal, appTz);
-  return { startUtc, endUtc, appTz };
+  return { startUtc, endUtc, appTz, _debug: { toUtcFn: (toUtc && toUtc.name) || 'toUtc' , sLocal, eLocal } };
 }
 
 function formatShiftRangeHuman(startUtc, endUtc, appTz) {
@@ -149,11 +162,27 @@ export async function createShift(req, res) {
 
   // Agendar notificações: confirmação imediata, lembrete 8h antes e 15m antes
     try {
-      const { startUtc, endUtc, appTz } = computeShiftUtc(date, startTime, endTime, spans);
+      const { startUtc, endUtc, appTz, _debug } = computeShiftUtc(date, startTime, endTime, spans);
       const { dateLabel, startLabel, endLabel, suffix } = formatShiftRangeHuman(startUtc, endUtc, appTz);
-      const rangeCompact = `${dateLabel} ${startLabel}–${endLabel}`;
+      if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
+        console.info('[planning][tz] computeShiftUtc', {
+          tz: appTz,
+          useFn: _debug?.toUtcFn,
+          sLocal: _debug?.sLocal,
+          eLocal: _debug?.eLocal,
+          startUtc: startUtc?.toISOString?.(),
+          endUtc: endUtc?.toISOString?.(),
+          dateLabel, startLabel, endLabel, suffix
+        });
+      }
+      // Para o conteúdo do email, use os valores fornecidos pelo usuário (evita qualquer variação de DST no texto)
+      const dateLabelLocal = formatDateBR(date);
+      const startLabelLocal = hhmm(startTime);
+      const endLabelLocal = hhmm(endTime);
+      const suffixLocal = spans ? ' (termina no dia seguinte)' : '';
+      const rangeCompact = `${dateLabelLocal} ${startLabelLocal}–${endLabelLocal}`;
       const subjectBase = `Escala confirmada - ${rangeCompact}`;
-      const textBase = `Você foi escalado(a) para ${dateLabel}, das ${startLabel} às ${endLabel}.${suffix ? ' ' + suffix : ''}`;
+      const textBase = `Você foi escalado para trabalhar no Cadoz no dia ${dateLabelLocal}, das ${startLabelLocal} às ${endLabelLocal}.${suffixLocal}`;
       const htmlBase = `<p>${textBase}</p>`;
 
       // INSERT em notifications_queue (schedule_confirm imediato)
