@@ -112,8 +112,7 @@ export async function createShift(req, res) {
         subject: subjectBase,
         html: htmlBase,
         text: textBase,
-        pushPayload: { title: 'Escala confirmada', body: `${startLabel}–${endLabel} (${dateLabel})` },
-        uniqueKey: `shift:${shift.id}:confirm:${createdAtMs}`
+        pushPayload: { title: 'Escala confirmada', body: `${startLabel}–${endLabel} (${dateLabel})` }
       });
       if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
         console.info('[planning] enqueued schedule_confirm', { shiftId: shift.id, enqueued: rConfirm?.enqueued, id: rConfirm?.id });
@@ -131,8 +130,7 @@ export async function createShift(req, res) {
           subject: `Lembrete (8h) - ${rangeCompact}`,
           html: `<p>Faltam ~8 horas para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.</p>`,
           text: `Faltam ~8 horas para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.`,
-          pushPayload: { title: 'Lembrete (8h)', body: `${startLabel}–${endLabel} (${dateLabel})` },
-          uniqueKey: `shift:${shift.id}:rem8h:${createdAtMs}`
+          pushPayload: { title: 'Lembrete (8h)', body: `${startLabel}–${endLabel} (${dateLabel})` }
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
           console.info('[planning] enqueued schedule_reminder_8h', { shiftId: shift.id, enqueued: r8h?.enqueued, id: r8h?.id });
@@ -150,8 +148,7 @@ export async function createShift(req, res) {
           subject: `Lembrete (15m) - ${rangeCompact}`,
           html: `<p>Faltam 15 minutos para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.</p>`,
           text: `Faltam 15 minutos para seu turno: ${dateLabel}, ${startLabel}–${endLabel}.`,
-          pushPayload: { title: 'Lembrete (15m)', body: `${startLabel}–${endLabel} (${dateLabel})` },
-          uniqueKey: `shift:${shift.id}:rem15m:${createdAtMs}`
+          pushPayload: { title: 'Lembrete (15m)', body: `${startLabel}–${endLabel} (${dateLabel})` }
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
           console.info('[planning] enqueued schedule_reminder_15m', { shiftId: shift.id, enqueued: r15?.enqueued, id: r15?.id });
@@ -194,8 +191,7 @@ export async function deleteShift(req, res) {
           subject,
           html,
           text,
-          pushPayload: { title: 'Escala cancelada', body: `${startLabel}–${endLabel} (${dateLabel})` },
-          uniqueKey: `shift:${id}:cancel:${cancelCreatedAtMs}`
+          pushPayload: { title: 'Escala cancelada', body: `${startLabel}–${endLabel} (${dateLabel})` }
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
           console.info('[planning] enqueued schedule_cancel', { shiftId: Number(id), enqueued: rCancel?.enqueued, id: rCancel?.id });
@@ -256,8 +252,7 @@ export async function updateShift(req, res) {
         subject,
         html,
         text,
-        pushPayload: { title: 'Escala atualizada', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
-        uniqueKey: `shift:${id}:update:${Date.now()}`
+        pushPayload: { title: 'Escala atualizada', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` }
       });
       if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
         console.info('[planning] enqueued schedule_update', { shiftId: Number(id) });
@@ -274,8 +269,7 @@ export async function updateShift(req, res) {
           subject: `Lembrete (8h) - ${nextRange}`,
           html: `<p>Faltam ~8 horas para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.</p>`,
           text: `Faltam ~8 horas para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.`,
-          pushPayload: { title: 'Lembrete (8h)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
-          uniqueKey: `shift:${id}:rem8h:${Date.now()}`
+          pushPayload: { title: 'Lembrete (8h)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` }
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
           console.info('[planning] enqueued schedule_reminder_8h (update)', { shiftId: Number(id) });
@@ -292,8 +286,7 @@ export async function updateShift(req, res) {
           subject: `Lembrete (15m) - ${nextRange}`,
           html: `<p>Faltam 15 minutos para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.</p>`,
           text: `Faltam 15 minutos para seu turno: ${nextHuman.dateLabel}, ${nextHuman.startLabel}–${nextHuman.endLabel}.`,
-          pushPayload: { title: 'Lembrete (15m)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` },
-          uniqueKey: `shift:${id}:rem15m:${Date.now()}`
+          pushPayload: { title: 'Lembrete (15m)', body: `${nextHuman.startLabel}–${nextHuman.endLabel} (${nextHuman.dateLabel})` }
         });
         if (process.env.LOG_PLANNING_NOTIFICATIONS === 'true') {
           console.info('[planning] enqueued schedule_reminder_15m (update)', { shiftId: Number(id) });
