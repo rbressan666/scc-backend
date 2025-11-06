@@ -50,7 +50,7 @@ export const getAllUsers = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const { nome_completo, email, senha, perfil } = req.body;
+    const { nome_completo, email, senha, perfil, ativo = true, setores = [] } = req.body;
     
     // Verificar se email já existe
     const existingUser = await pool.query(
@@ -72,11 +72,29 @@ export const createUser = async (req, res) => {
     // Criar usuário - CORRIGIDO para usar nomes das colunas do Supabase
     const result = await pool.query(`
       INSERT INTO usuarios (nome_completo, email, senha_hash, perfil, ativo, data_criacao, data_atualizacao)
-      VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
       RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao
-    `, [nome_completo, email, hashedPassword, perfil]);
+    `, [nome_completo, email, hashedPassword, perfil, !!ativo]);
     
     const newUser = result.rows[0];
+
+    // Vincular setores (se fornecidos)
+    if (Array.isArray(setores) && setores.length) {
+      const values = [];
+      const params = [];
+      let p = 1;
+      for (const sid of setores) {
+        if (!sid) continue;
+        params.push(`($${p++}, $${p++})`);
+        values.push(newUser.id, sid);
+      }
+      if (params.length) {
+        await pool.query(
+          `INSERT INTO user_sectors(user_id, setor_id) VALUES ${params.join(', ')} ON CONFLICT DO NOTHING`,
+          values
+        );
+      }
+    }
     
     // Normalizar nomes das colunas para resposta
     const userResponse = {
@@ -229,6 +247,17 @@ export const getUserById = async (req, res) => {
       created_at: user.data_criacao,
       updated_at: user.data_atualizacao
     };
+
+    // Buscar setores vinculados
+    const setoresRes = await pool.query(
+      `SELECT s.id, s.nome
+       FROM user_sectors us
+       JOIN setores s ON s.id = us.setor_id
+       WHERE us.user_id = $1
+       ORDER BY s.nome ASC`,
+      [id]
+    );
+    userResponse.setores = setoresRes.rows || [];
     
     res.json({
       success: true,
@@ -247,7 +276,7 @@ export const getUserById = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome_completo, email, perfil, senha } = req.body;
+    const { nome_completo, email, perfil, senha, ativo, setores } = req.body;
     
     // Verificar se usuário existe
     const existingUser = await pool.query(
@@ -299,6 +328,11 @@ export const updateUser = async (req, res) => {
       updateValues.push(perfil);
       paramCount++;
     }
+    if (typeof ativo === 'boolean') {
+      updateFields.push(`ativo = $${paramCount}`);
+      updateValues.push(!!ativo);
+      paramCount++;
+    }
     
     if (senha) {
       const saltRounds = 12;
@@ -320,6 +354,27 @@ export const updateUser = async (req, res) => {
     
     const result = await pool.query(query, updateValues);
     const updatedUser = result.rows[0];
+
+    // Atualizar vínculos de setores se fornecido
+    if (Array.isArray(setores)) {
+      await pool.query('DELETE FROM user_sectors WHERE user_id = $1', [id]);
+      if (setores.length) {
+        const vals = [];
+        const params = [];
+        let p = 1;
+        for (const sid of setores) {
+          if (!sid) continue;
+          params.push(`($${p++}, $${p++})`);
+          vals.push(id, sid);
+        }
+        if (params.length) {
+          await pool.query(
+            `INSERT INTO user_sectors(user_id, setor_id) VALUES ${params.join(', ')} ON CONFLICT DO NOTHING`,
+            vals
+          );
+        }
+      }
+    }
     
     // Normalizar nomes das colunas para resposta
     const userResponse = {
