@@ -1,6 +1,8 @@
 // controllers/userController.js (CORRIGIDO PARA COLUNAS DO SUPABASE)
 import bcrypt from 'bcrypt';
 import pool from '../config/database.js';
+import crypto from 'crypto';
+import { sendMail } from '../services/emailService.js';
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -101,6 +103,82 @@ export const createUser = async (req, res) => {
       success: false,
       message: 'Erro interno do servidor'
     });
+  }
+};
+
+// Convidar usuário (sem senha inicial) e definir setores onde pode trabalhar
+export const inviteUser = async (req, res) => {
+  try {
+    const { nome_completo, email, telefone, setores = [], perfil = 'colaborador' } = req.body;
+
+    if (!nome_completo || !email) {
+      return res.status(400).json({ success: false, message: 'Nome e email são obrigatórios' });
+    }
+
+    const existing = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
+    if (existing.rows.length) {
+      return res.status(409).json({ success: false, message: 'Email já está em uso' });
+    }
+
+    // Criar usuário com senha_hash nula
+    const insUser = await pool.query(
+      `INSERT INTO usuarios (nome_completo, email, telefone, perfil, ativo, data_criacao, data_atualizacao)
+       VALUES ($1,$2,$3,$4,true,NOW(),NOW())
+       RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao`,
+      [nome_completo, email, telefone || null, perfil]
+    );
+    const user = insUser.rows[0];
+
+    // Vincular setores (se fornecidos)
+    if (Array.isArray(setores) && setores.length) {
+      const values = [];
+      const params = [];
+      let p = 1;
+      for (const sid of setores) {
+        if (!sid) continue;
+        params.push(`($${p++}, $${p++})`);
+        values.push(user.id, sid);
+      }
+      if (params.length) {
+        await pool.query(
+          `INSERT INTO user_sectors(user_id, setor_id) VALUES ${params.join(', ')} ON CONFLICT DO NOTHING`,
+          values
+        );
+      }
+    }
+
+    // Gerar token de confirmação
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await pool.query(
+      `INSERT INTO user_signup_tokens(user_id, token, purpose, expires_at)
+       VALUES ($1, $2, 'confirm_email', $3)`,
+      [user.id, token, expiresAt]
+    );
+
+    const frontendBase = process.env.FRONTEND_URL || 'https://scc-frontend-z3un.onrender.com';
+    const confirmUrl = `${frontendBase}/confirmar?token=${token}`;
+
+    // Enviar email
+    const subject = 'Cadoz: Confirme seu cadastro';
+    const html = `
+      <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#222">
+        <p>Olá ${nome_completo},</p>
+        <p>Seu acesso ao sistema do Cadoz foi criado. Para concluir:</p>
+        <ol>
+          <li>Clique no link para confirmar seu e-mail: <a href="${confirmUrl}">Confirmar cadastro</a></li>
+          <li>Defina sua senha.</li>
+          <li>No primeiro acesso, leia e confirme os Termos de Conduta e Operação (geral e do(s) seu(s) setor(es)).</li>
+        </ol>
+        <p>Se você não esperava este convite, ignore este e-mail.</p>
+      </div>
+    `;
+    await sendMail({ to: email, subject, html, text: `Confirme seu cadastro: ${confirmUrl}` });
+
+    res.status(201).json({ success: true, message: 'Convite enviado', data: user });
+  } catch (error) {
+    console.error('Erro ao convidar usuário:', error);
+    res.status(500).json({ success: false, message: 'Erro interno do servidor' });
   }
 };
 

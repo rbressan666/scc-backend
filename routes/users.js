@@ -8,7 +8,8 @@ import {
   deactivateUser,
   reactivateUser,
   getUserProfile,
-  updateUserProfile
+  updateUserProfile,
+  inviteUser
 } from '../controllers/userController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { validateCreateUser, validateUpdateUser } from '../middleware/validators.js';
@@ -25,6 +26,7 @@ router.put('/profile', updateUserProfile);
 // Rotas que requerem admin
 router.get('/', requireAdmin, getAllUsers);
 router.post('/', requireAdmin, validateCreateUser, createUser);
+router.post('/invite', requireAdmin, inviteUser);
 router.get('/:id', getUserById);
 router.put('/:id', requireAdmin, validateUpdateUser, updateUser);
 router.delete('/:id', requireAdmin, deactivateUser);

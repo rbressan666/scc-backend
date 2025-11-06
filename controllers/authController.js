@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import { notifyAdminsOnLogin } from '../services/emailService.js';
+import crypto from 'crypto';
 
 export const login = async (req, res) => {
   try {
@@ -238,6 +239,69 @@ export const changePassword = async (req, res) => {
       success: false,
       message: 'Erro interno do servidor'
     });
+  }
+};
+
+// Confirmar e-mail a partir de token e redirecionar para definir senha
+export const confirmSignup = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ success: false, message: 'Token ausente' });
+
+    const { rows } = await pool.query(
+      `SELECT user_id, purpose, expires_at, used_at FROM user_signup_tokens WHERE token = $1`,
+      [token]
+    );
+    if (!rows.length || rows[0].purpose !== 'confirm_email') {
+      return res.status(400).json({ success: false, message: 'Token inválido' });
+    }
+    const t = rows[0];
+    if (t.used_at) return res.status(400).json({ success: false, message: 'Token já utilizado' });
+    if (new Date(t.expires_at) < new Date()) return res.status(400).json({ success: false, message: 'Token expirado' });
+
+    await pool.query(`UPDATE usuarios SET email_confirmado_em = NOW(), data_atualizacao = NOW() WHERE id = $1`, [t.user_id]);
+    await pool.query(`UPDATE user_signup_tokens SET used_at = NOW() WHERE token = $1`, [token]);
+
+    // Gera token para definir senha
+    const newToken = crypto.randomBytes(32).toString('hex');
+    const exp = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.query(
+      `INSERT INTO user_signup_tokens(user_id, token, purpose, expires_at) VALUES ($1,$2,'set_password',$3)`,
+      [t.user_id, newToken, exp]
+    );
+
+    const frontendBase = process.env.FRONTEND_URL || 'https://scc-frontend-z3un.onrender.com';
+    const setUrl = `${frontendBase}/definir-senha?token=${newToken}`;
+    res.json({ success: true, setPasswordUrl: setUrl });
+  } catch (err) {
+    console.error('Erro ao confirmar cadastro:', err);
+    res.status(500).json({ success: false, message: 'Erro interno' });
+  }
+};
+
+// Definir senha usando token de set_password
+export const setPasswordWithToken = async (req, res) => {
+  try {
+    const { token, senha } = req.body;
+    if (!token || !senha) return res.status(400).json({ success: false, message: 'Dados inválidos' });
+    const { rows } = await pool.query(
+      `SELECT user_id, purpose, expires_at, used_at FROM user_signup_tokens WHERE token = $1`,
+      [token]
+    );
+    if (!rows.length || rows[0].purpose !== 'set_password') {
+      return res.status(400).json({ success: false, message: 'Token inválido' });
+    }
+    const t = rows[0];
+    if (t.used_at) return res.status(400).json({ success: false, message: 'Token já utilizado' });
+    if (new Date(t.expires_at) < new Date()) return res.status(400).json({ success: false, message: 'Token expirado' });
+
+    const hashed = await bcrypt.hash(senha, 12);
+    await pool.query(`UPDATE usuarios SET senha_hash = $1, data_atualizacao = NOW() WHERE id = $2`, [hashed, t.user_id]);
+    await pool.query(`UPDATE user_signup_tokens SET used_at = NOW() WHERE token = $1`, [token]);
+    res.json({ success: true, message: 'Senha definida com sucesso' });
+  } catch (err) {
+    console.error('Erro ao definir senha:', err);
+    res.status(500).json({ success: false, message: 'Erro interno' });
   }
 };
 

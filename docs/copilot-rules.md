@@ -2,6 +2,10 @@
 
 Use estas instruções como “prompt pinado” ao trabalhar neste repositório.
 
+## 0) Idioma e limites de ação
+- Idioma: Todas as respostas devem ser em Português brasileiro (pt-BR), de forma clara e objetiva.
+- Escopo: Não altere arquivos/código a menos que eu peça explicitamente para alterar. Se algo parecer necessário, proponha primeiro e aguarde confirmação.
+
 ## 1) Diário do desenvolvedor (interno)
 - Sempre que gerar alterações, atualize o arquivo `diario_ajustes.md` (na raiz do backend ou frontend, conforme aplicável).
 - Registre data e hora (ISO com timezone) e um resumo objetivo do que foi feito.
