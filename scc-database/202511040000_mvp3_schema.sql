@@ -165,4 +165,3 @@ CREATE TRIGGER update_turnos_updated_at BEFORE UPDATE ON turnos FOR EACH ROW EXE
 CREATE TRIGGER update_contagens_updated_at BEFORE UPDATE ON contagens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_alertas_updated_at BEFORE UPDATE ON alertas FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_configuracoes_email_updated_at BEFORE UPDATE ON configuracoes_email FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-

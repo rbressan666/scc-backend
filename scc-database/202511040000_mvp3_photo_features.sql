@@ -181,4 +181,3 @@ COMMENT ON COLUMN busca_foto_historico.termos_busca IS 'Array de termos derivado
 COMMENT ON COLUMN reconhecimento_aprendizado.score_similaridade IS 'Score de similaridade entre imagem capturada e imagem de referência';
 
 COMMIT;
-

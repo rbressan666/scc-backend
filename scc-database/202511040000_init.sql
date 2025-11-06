@@ -60,4 +60,3 @@ COMMENT ON COLUMN usuarios.perfil IS 'Nível de permissão: admin ou operador';
 COMMENT ON COLUMN usuarios.ativo IS 'Status do usuário (ativo/inativo)';
 COMMENT ON COLUMN usuarios.data_criacao IS 'Data e hora de criação do registro';
 COMMENT ON COLUMN usuarios.data_atualizacao IS 'Data e hora da última atualização';
-

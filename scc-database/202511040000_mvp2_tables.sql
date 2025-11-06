@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS variacoes_produto (
     estoque_minimo DECIMAL(10, 3) NOT NULL DEFAULT 0.000,
     preco_custo DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     fator_prioridade INTEGER NOT NULL DEFAULT 3,
-    id_unidade_controle UUID NOT NULL REFERENCES unidades_de_medida(id) ON DELETE RESTRICT,
+    id_unidade_controle UUID NOT NULL REFERENCES unidades_de_medida(id) ON DELETE CASCADE,
     ativo BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -146,4 +146,3 @@ SELECT 'Temperos', id FROM categorias WHERE nome = 'Alimentos'
 ON CONFLICT DO NOTHING;
 
 COMMIT;
-

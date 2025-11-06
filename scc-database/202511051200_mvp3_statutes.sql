@@ -1,4 +1,4 @@
--- MVP3 - Estatutos (termos de conduta e operação)
+-- 202511051200 - MVP3 - Estatutos (termos de conduta e operação)
 -- Tabelas: statutes, statute_items, user_statute_acks, user_sectors, user_signup_tokens
 -- Nota: usa convenção de nomes já presentes (pt-BR) em 'usuarios'
 
@@ -6,8 +6,8 @@ BEGIN;
 
 -- Relação N:N usuário-setor (onde o usuário pode trabalhar)
 CREATE TABLE IF NOT EXISTS user_sectors (
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-  setor_id INTEGER NOT NULL REFERENCES setores(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  setor_id UUID NOT NULL REFERENCES setores(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   PRIMARY KEY (user_id, setor_id)
 );
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS statutes (
   code VARCHAR(80) UNIQUE NOT NULL,
   title VARCHAR(200) NOT NULL,
   description TEXT,
-  setor_id INTEGER NULL REFERENCES setores(id) ON DELETE CASCADE,
+  setor_id UUID NULL REFERENCES setores(id) ON DELETE CASCADE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   version INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_statute_items_statute ON statute_items(statute_id
 -- Ciência dos itens por usuário
 CREATE TABLE IF NOT EXISTS user_statute_acks (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   statute_id INTEGER NOT NULL REFERENCES statutes(id) ON DELETE CASCADE,
   item_id INTEGER NOT NULL REFERENCES statute_items(id) ON DELETE CASCADE,
   acknowledged_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_user_statute_acks_user ON user_statute_acks(user_
 -- Tokens de convite/primeiro acesso
 CREATE TABLE IF NOT EXISTS user_signup_tokens (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   token VARCHAR(128) UNIQUE NOT NULL,
   purpose VARCHAR(40) NOT NULL,
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
