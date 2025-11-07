@@ -180,12 +180,12 @@ export const inviteUser = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Email já está em uso' });
     }
 
-    // Criar usuário com senha_hash nula
+    // Criar usuário com senha_hash nula (não depender da coluna telefone)
     const insUser = await pool.query(
-      `INSERT INTO usuarios (nome_completo, email, telefone, perfil, ativo, data_criacao, data_atualizacao)
-       VALUES ($1,$2,$3,$4,true,NOW(),NOW())
+      `INSERT INTO usuarios (nome_completo, email, perfil, ativo, data_criacao, data_atualizacao)
+       VALUES ($1,$2,$3,true,NOW(),NOW())
        RETURNING id, nome_completo, email, perfil, ativo, data_criacao, data_atualizacao`,
-      [nome_completo, email, telefone || null, perfil]
+      [nome_completo, email, perfil]
     );
     const user = insUser.rows[0];
 

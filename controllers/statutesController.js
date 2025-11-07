@@ -21,9 +21,9 @@ export const listPending = async (req, res) => {
       `SELECT id, code, title, setor_id
        FROM statutes
        WHERE active = true
-         AND (setor_id IS NULL OR setor_id = ANY($1::int[]))
+         AND (setor_id IS NULL OR setor_id = ANY(COALESCE($1::uuid[], ARRAY[]::uuid[])))
        ORDER BY (setor_id IS NULL) DESC, id ASC`,
-      [setorIds.length ? setorIds : [0]]
+      [setorIds]
     );
 
     if (!statutes.length) {
