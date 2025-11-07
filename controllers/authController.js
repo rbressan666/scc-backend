@@ -271,7 +271,8 @@ export const confirmSignup = async (req, res) => {
     );
 
     const frontendBase = process.env.FRONTEND_URL || 'https://scc-frontend-z3un.onrender.com';
-    const setUrl = `${frontendBase}/definir-senha?token=${newToken}`;
+  // Usando hash routing para evitar dependência de rewrites no frontend
+  const setUrl = `${frontendBase}/#/definir-senha?token=${newToken}`;
     res.json({ success: true, setPasswordUrl: setUrl });
   } catch (err) {
     console.error('Erro ao confirmar cadastro:', err);

@@ -16,7 +16,8 @@ async function createConfirmTokenAndSendEmail({ userId, nome, email }) {
   );
 
   const frontendBase = process.env.FRONTEND_URL || 'https://scc-frontend-z3un.onrender.com';
-  const confirmUrl = `${frontendBase}/confirmar?token=${token}`;
+  // Usando hash routing para evitar dependência de rewrites no frontend
+  const confirmUrl = `${frontendBase}/#/confirmar?token=${token}`;
 
   // Enviar email
   const subject = 'Cadoz: Confirme seu cadastro';
