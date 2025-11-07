@@ -4,6 +4,39 @@ import pool from '../config/database.js';
 import crypto from 'crypto';
 import { sendMail } from '../services/emailService.js';
 
+// Helper: cria token de confirmação e envia e-mail
+async function createConfirmTokenAndSendEmail({ userId, nome, email }) {
+  // Gerar token de confirmação
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await pool.query(
+    `INSERT INTO user_signup_tokens(user_id, token, purpose, expires_at)
+     VALUES ($1, $2, 'confirm_email', $3)`,
+    [userId, token, expiresAt]
+  );
+
+  const frontendBase = process.env.FRONTEND_URL || 'https://scc-frontend-z3un.onrender.com';
+  const confirmUrl = `${frontendBase}/confirmar?token=${token}`;
+
+  // Enviar email
+  const subject = 'Cadoz: Confirme seu cadastro';
+  const html = `
+      <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#222">
+        <p>Olá ${nome},</p>
+        <p>Seu acesso ao sistema do Cadoz foi criado. Para concluir:</p>
+        <ol>
+          <li>Clique no link para confirmar seu e-mail: <a href="${confirmUrl}">Confirmar cadastro</a></li>
+          <li>Defina sua senha.</li>
+          <li>No primeiro acesso, leia e confirme os Termos de Conduta e Operação (geral e do(s) seu(s) setor(es)).</li>
+        </ol>
+        <p>Se você não esperava este convite, ignore este e-mail.</p>
+      </div>
+    `;
+  await sendMail({ to: email, subject, html, text: `Confirme seu cadastro: ${confirmUrl}` });
+
+  return { invitation_sent: true, invitation_expires_at: expiresAt };
+}
+
 export const getAllUsers = async (req, res) => {
   try {
     // CORRIGIDO para usar nomes das colunas do Supabase
@@ -107,12 +140,20 @@ export const createUser = async (req, res) => {
       updated_at: newUser.data_atualizacao
     };
     
+    // Disparar e-mail de confirmação como no fluxo de convite
+    let inviteMeta = { invitation_sent: false };
+    try {
+      inviteMeta = await createConfirmTokenAndSendEmail({ userId: newUser.id, nome: newUser.nome_completo, email: newUser.email });
+    } catch (err) {
+      console.error('Aviso: falha ao enviar e-mail de confirmação após criação de usuário:', err);
+    }
+
     console.log(`👤 Usuário criado: ${email} por admin ID: ${req.user.id}`);
-    
+
     res.status(201).json({
       success: true,
       message: 'Usuário criado com sucesso',
-      data: userResponse
+      data: { ...userResponse, ...inviteMeta }
     });
     
   } catch (error) {
@@ -165,35 +206,9 @@ export const inviteUser = async (req, res) => {
       }
     }
 
-    // Gerar token de confirmação
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await pool.query(
-      `INSERT INTO user_signup_tokens(user_id, token, purpose, expires_at)
-       VALUES ($1, $2, 'confirm_email', $3)`,
-      [user.id, token, expiresAt]
-    );
+    const inviteMeta = await createConfirmTokenAndSendEmail({ userId: user.id, nome: nome_completo, email });
 
-    const frontendBase = process.env.FRONTEND_URL || 'https://scc-frontend-z3un.onrender.com';
-    const confirmUrl = `${frontendBase}/confirmar?token=${token}`;
-
-    // Enviar email
-    const subject = 'Cadoz: Confirme seu cadastro';
-    const html = `
-      <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#222">
-        <p>Olá ${nome_completo},</p>
-        <p>Seu acesso ao sistema do Cadoz foi criado. Para concluir:</p>
-        <ol>
-          <li>Clique no link para confirmar seu e-mail: <a href="${confirmUrl}">Confirmar cadastro</a></li>
-          <li>Defina sua senha.</li>
-          <li>No primeiro acesso, leia e confirme os Termos de Conduta e Operação (geral e do(s) seu(s) setor(es)).</li>
-        </ol>
-        <p>Se você não esperava este convite, ignore este e-mail.</p>
-      </div>
-    `;
-    await sendMail({ to: email, subject, html, text: `Confirme seu cadastro: ${confirmUrl}` });
-
-    res.status(201).json({ success: true, message: 'Convite enviado', data: user });
+    res.status(201).json({ success: true, message: 'Convite enviado', data: { ...user, ...inviteMeta } });
   } catch (error) {
     console.error('Erro ao convidar usuário:', error);
     res.status(500).json({ success: false, message: 'Erro interno do servidor' });
