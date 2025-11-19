@@ -1,5 +1,13 @@
 import pool from '../config/database.js';
-import crypto from 'crypto';
+
+// Helper para gerar code slug a partir de título
+const slugify = (str) => str
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[^\w\s-]/g, '')
+  .trim()
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-');
 
 export const listPending = async (req, res) => {
   try {
@@ -151,9 +159,22 @@ export const listAll = async (req, res) => {
 export const createStatute = async (req, res) => {
   if (!ensureAdmin(req, res)) return;
   try {
-    const { code, title, description, setor_id } = req.body;
-    if (!code || !title) {
-      return res.status(400).json({ success: false, message: 'code e title são obrigatórios' });
+    const { title, description, setor_id } = req.body;
+    if (!title) {
+      return res.status(400).json({ success: false, message: 'title é obrigatório' });
+    }
+    const codeBase = slugify(title).slice(0, 60) || 'grupo';
+    let code = codeBase;
+    // Garantir unicidade de code; se conflito, acrescenta sufixo numérico
+    let attempt = 1;
+    while (true) {
+      const { rows: exists } = await pool.query('SELECT 1 FROM statutes WHERE code = $1', [code]);
+      if (!exists.length) break;
+      attempt += 1;
+      code = `${codeBase}-${attempt}`.slice(0, 75);
+      if (attempt > 50) {
+        return res.status(500).json({ success: false, message: 'Falha ao gerar código único' });
+      }
     }
     const { rows } = await pool.query(
       `INSERT INTO statutes(code, title, description, setor_id)
@@ -164,8 +185,7 @@ export const createStatute = async (req, res) => {
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     console.error('[statutes] createStatute error:', err);
-    const msg = err.code === '23505' ? 'Código já existente' : 'Erro ao criar estatuto';
-    res.status(500).json({ success: false, message: msg });
+    res.status(500).json({ success: false, message: 'Erro ao criar grupo' });
   }
 };
 
@@ -216,10 +236,28 @@ export const deleteStatute = async (req, res) => {
 export const createItem = async (req, res) => {
   if (!ensureAdmin(req, res)) return;
   try {
-    const { id } = req.params; // statute id
-    const { code, sequence = 0, text } = req.body;
-    if (!code || !text) {
-      return res.status(400).json({ success: false, message: 'code e text são obrigatórios' });
+    const { id } = req.params; // statute id (grupo)
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ success: false, message: 'text é obrigatório' });
+    }
+    // Gerar code incremental baseado no count existente
+    const { rows: seqRows } = await pool.query(
+      'SELECT COALESCE(MAX(sequence),0) + 10 AS next_seq FROM statute_items WHERE statute_id = $1',
+      [id]
+    );
+    const sequence = seqRows[0]?.next_seq || 10;
+    const base = slugify(text).slice(0, 90) || 'termo';
+    let code = base;
+    let attempt = 1;
+    while (true) {
+      const { rows: exists } = await pool.query('SELECT 1 FROM statute_items WHERE code = $1', [code]);
+      if (!exists.length) break;
+      attempt += 1;
+      code = `${base}-${attempt}`.slice(0, 110);
+      if (attempt > 50) {
+        return res.status(500).json({ success: false, message: 'Falha ao gerar código único do termo' });
+      }
     }
     const { rows } = await pool.query(
       `INSERT INTO statute_items(statute_id, code, sequence, text)
@@ -230,8 +268,7 @@ export const createItem = async (req, res) => {
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     console.error('[statutes] createItem error:', err);
-    const msg = err.code === '23505' ? 'Código de item já existente' : 'Erro ao criar item';
-    res.status(500).json({ success: false, message: msg });
+    res.status(500).json({ success: false, message: 'Erro ao criar termo' });
   }
 };
 
