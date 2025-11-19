@@ -176,6 +176,14 @@ export const createStatute = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Falha ao gerar código único' });
       }
     }
+    // Regra de negócio: exigir setor_id em todo grupo exceto o grupo Geral (code 'geral')
+    const isGeneral = codeBase === 'geral';
+    if (isGeneral && setor_id) {
+      return res.status(400).json({ success: false, message: 'Grupo Geral não deve possuir setor' });
+    }
+    if (!isGeneral && !setor_id) {
+      return res.status(400).json({ success: false, message: 'setor_id é obrigatório para grupos (exceto Geral)' });
+    }
     const { rows } = await pool.query(
       `INSERT INTO statutes(code, title, description, setor_id)
        VALUES ($1, $2, $3, $4)
@@ -195,20 +203,39 @@ export const updateStatute = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, active, setor_id } = req.body;
-    const { rows } = await pool.query(
+    // Buscar registro atual para aplicar regras de negócio
+    const { rows: currentRows } = await pool.query('SELECT id, code, setor_id FROM statutes WHERE id = $1', [id]);
+    if (!currentRows.length) return res.status(404).json({ success: false, message: 'Estatuto não encontrado' });
+    const current = currentRows[0];
+    const isGeneral = current.code === 'geral';
+
+    // Regras:
+    // - Geral: não pode receber setor_id (deve permanecer NULL)
+    // - Não Geral: deve possuir setor_id (existente ou fornecido na atualização)
+    if (isGeneral) {
+      if (setor_id) {
+        return res.status(400).json({ success: false, message: 'Não é permitido definir setor para o grupo Geral' });
+      }
+    } else {
+      const finalSetorId = setor_id || current.setor_id;
+      if (!finalSetorId) {
+        return res.status(400).json({ success: false, message: 'setor_id é obrigatório para este grupo' });
+      }
+    }
+
+    const { rows: updated } = await pool.query(
       `UPDATE statutes
          SET title = COALESCE($2, title),
              description = COALESCE($3, description),
              active = COALESCE($4, active),
-             setor_id = COALESCE($5, setor_id),
+             setor_id = CASE WHEN code = 'geral' THEN NULL ELSE COALESCE($5, setor_id) END,
              version = version + 1,
              updated_at = NOW()
        WHERE id = $1
        RETURNING id, code, title, description, setor_id, active, version`,
       [id, title || null, description || null, typeof active === 'boolean' ? active : null, setor_id || null]
     );
-    if (!rows.length) return res.status(404).json({ success: false, message: 'Estatuto não encontrado' });
-    res.json({ success: true, data: rows[0] });
+    res.json({ success: true, data: updated[0] });
   } catch (err) {
     console.error('[statutes] updateStatute error:', err);
     res.status(500).json({ success: false, message: 'Erro ao atualizar estatuto' });
