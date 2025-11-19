@@ -87,3 +87,231 @@ export const acknowledge = async (req, res) => {
     res.status(500).json({ success: false, message: 'Erro ao registrar ciência' });
   }
 };
+
+// ===== NOVOS ENDPOINTS (CRUD / Listagens) =====
+
+const ensureAdmin = (req, res) => {
+  if (req.user?.perfil !== 'admin') {
+    res.status(403).json({ success: false, message: 'Acesso restrito a administradores' });
+    return false;
+  }
+  return true;
+};
+
+// Listar todos os estatutos com seus itens (opcional filtro por ativo / setor)
+export const listAll = async (req, res) => {
+  try {
+    const { includeInactive = 'false', setor_id = null } = req.query;
+    const incInactive = String(includeInactive) === 'true';
+    const params = [];
+    let where = 'WHERE 1=1';
+    if (!incInactive) {
+      where += ' AND s.active = true';
+    }
+    if (setor_id) {
+      params.push(setor_id);
+      where += ` AND (s.setor_id = $${params.length})`;
+    }
+    const { rows: statutes } = await pool.query(
+      `SELECT s.id, s.code, s.title, s.description, s.setor_id, s.active, s.version
+       FROM statutes s
+       ${where}
+       ORDER BY s.id ASC`,
+      params
+    );
+    if (!statutes.length) {
+      return res.json({ success: true, data: [] });
+    }
+    const statuteIds = statutes.map(s => s.id);
+    const { rows: items } = await pool.query(
+      `SELECT i.id, i.statute_id, i.code, i.sequence, i.text, i.active
+         FROM statute_items i
+        WHERE i.statute_id = ANY($1::int[])
+        ORDER BY i.statute_id, i.sequence, i.id`,
+      [statuteIds]
+    );
+    const grouped = statutes.map(s => ({
+      id: s.id,
+      code: s.code,
+      title: s.title,
+      description: s.description,
+      setor_id: s.setor_id,
+      active: s.active,
+      version: s.version,
+      items: items.filter(it => it.statute_id === s.id)
+    }));
+    res.json({ success: true, data: grouped });
+  } catch (err) {
+    console.error('[statutes] listAll error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao listar estatutos' });
+  }
+};
+
+// Criar novo estatuto
+export const createStatute = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { code, title, description, setor_id } = req.body;
+    if (!code || !title) {
+      return res.status(400).json({ success: false, message: 'code e title são obrigatórios' });
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO statutes(code, title, description, setor_id)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, code, title, description, setor_id, active, version`,
+      [code, title, description || null, setor_id || null]
+    );
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[statutes] createStatute error:', err);
+    const msg = err.code === '23505' ? 'Código já existente' : 'Erro ao criar estatuto';
+    res.status(500).json({ success: false, message: msg });
+  }
+};
+
+// Atualizar estatuto
+export const updateStatute = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { id } = req.params;
+    const { title, description, active, setor_id } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE statutes
+         SET title = COALESCE($2, title),
+             description = COALESCE($3, description),
+             active = COALESCE($4, active),
+             setor_id = COALESCE($5, setor_id),
+             version = version + 1,
+             updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, code, title, description, setor_id, active, version`,
+      [id, title || null, description || null, typeof active === 'boolean' ? active : null, setor_id || null]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Estatuto não encontrado' });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[statutes] updateStatute error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao atualizar estatuto' });
+  }
+};
+
+// Desativar (soft delete) estatuto
+export const deleteStatute = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query(
+      `UPDATE statutes SET active = false, updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Estatuto não encontrado' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[statutes] deleteStatute error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao desativar estatuto' });
+  }
+};
+
+// Criar item de estatuto
+export const createItem = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { id } = req.params; // statute id
+    const { code, sequence = 0, text } = req.body;
+    if (!code || !text) {
+      return res.status(400).json({ success: false, message: 'code e text são obrigatórios' });
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO statute_items(statute_id, code, sequence, text)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, statute_id, code, sequence, text, active`,
+      [id, code, sequence, text]
+    );
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[statutes] createItem error:', err);
+    const msg = err.code === '23505' ? 'Código de item já existente' : 'Erro ao criar item';
+    res.status(500).json({ success: false, message: msg });
+  }
+};
+
+// Atualizar item
+export const updateItem = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { itemId } = req.params;
+    const { sequence, text, active } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE statute_items
+         SET sequence = COALESCE($2, sequence),
+             text = COALESCE($3, text),
+             active = COALESCE($4, active),
+             updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, statute_id, code, sequence, text, active`,
+      [itemId, typeof sequence === 'number' ? sequence : null, text || null, typeof active === 'boolean' ? active : null]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Item não encontrado' });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('[statutes] updateItem error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao atualizar item' });
+  }
+};
+
+// Desativar item
+export const deleteItem = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { itemId } = req.params;
+    const { rows } = await pool.query(
+      `UPDATE statute_items SET active = false, updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [itemId]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'Item não encontrado' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[statutes] deleteItem error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao desativar item' });
+  }
+};
+
+// Listagem agregada de todas as ciências (acks)
+export const listAcknowledgements = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+  try {
+    const { rows } = await pool.query(
+      `SELECT a.user_id, u.email as user_email, a.item_id, i.code as item_code, a.acknowledged_at
+         FROM user_statute_acks a
+         JOIN usuarios u ON u.id = a.user_id
+         JOIN statute_items i ON i.id = a.item_id
+        ORDER BY a.acknowledged_at DESC
+        LIMIT 500`
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[statutes] listAcknowledgements error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao listar ciência' });
+  }
+};
+
+// Ciência de um usuário específico
+export const userAcknowledgements = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ success: false, message: 'userId obrigatório' });
+    const { rows } = await pool.query(
+      `SELECT a.item_id, i.code as item_code, i.text, a.statute_id, s.code as statute_code, s.title as statute_title, a.acknowledged_at
+         FROM user_statute_acks a
+         JOIN statute_items i ON i.id = a.item_id
+         JOIN statutes s ON s.id = a.statute_id
+        WHERE a.user_id = $1
+        ORDER BY a.acknowledged_at DESC`,
+      [userId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error('[statutes] userAcknowledgements error:', err);
+    res.status(500).json({ success: false, message: 'Erro ao listar ciência do usuário' });
+  }
+};
