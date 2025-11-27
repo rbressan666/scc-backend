@@ -12,6 +12,7 @@ import {
     leaveTurno
 } from '../controllers/turnoController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { getChecklist, lockPergunta, unlockPergunta, responderPergunta } from '../controllers/checklistController.js';
 
 const router = express.Router();
 
@@ -32,5 +33,14 @@ router.route('/:id/reopen').put(authenticateToken, requireAdmin, reopenTurno);
 router.route('/:id/join').post(authenticateToken, joinTurno);
 router.route('/:id/participants').get(authenticateToken, listTurnoParticipants);
 router.route('/:id/leave').post(authenticateToken, leaveTurno);
+
+// Checklist (entrada/saida) por turno
+router.route('/:id/checklist')
+    .get(authenticateToken, getChecklist); // usar query param ?tipo=entrada|saida
+router.route('/:id/checklist/lock/:perguntaId')
+    .post(authenticateToken, lockPergunta)
+    .delete(authenticateToken, unlockPergunta);
+router.route('/:id/checklist/responder')
+    .post(authenticateToken, responderPergunta);
 
 export default router;
