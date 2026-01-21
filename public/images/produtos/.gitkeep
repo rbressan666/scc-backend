@@ -1,0 +1,9 @@
+# Esta pasta contém as imagens dos produtos
+# As imagens são servidas pelo backend através de /images/produtos/*
+#
+# Para adicionar imagens:
+# 1. Coloque os arquivos aqui
+# 2. Execute o script SQL 202601200001_atualizar_urls_imagens.sql
+#
+# Formatos suportados: JPG, PNG, WebP
+# Nomenclatura: use hífens, minúsculas (ex: coca-cola-350ml.jpg)

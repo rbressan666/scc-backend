@@ -90,7 +90,42 @@ Backend do MVP1 do Sistema Contagem Cadoz (SCC) desenvolvido em Node.js com Expr
 - `POST /api/push/subscribe` - Registra a subscription do usuário logado
 - `POST /api/push/unsubscribe` - Remove/desativa a subscription do usuário
 
-## 🔐 Autenticação
+## �️ Sistema de Imagens
+
+O backend serve arquivos estáticos de imagens através do endpoint `/images/*`.
+
+### Scripts de Configuração
+1. **Renomeação:** `scc-database/202601200003_renomear_produtos.sql`
+2. **Imagens:** `scc-database/202601200001_atualizar_urls_imagens.sql`
+
+### Estrutura de Pastas
+```
+public/
+  images/
+    produtos/     # 60 imagens de produtos
+      AGUA garrafa 500 ml.png
+      COCA COLA 350ml.png
+      ...
+```
+
+### Como Adicionar Imagens
+1. Coloque suas imagens em `public/images/produtos/`
+2. Execute os scripts SQL na ordem indicada
+3. As imagens aparecerão automaticamente na lista de produtos
+
+### Scripts de Ajuda
+- `scripts/copy_images.bat` - Copia imagens automaticamente (Windows)
+- `scripts/copy_images.ps1` - Copia imagens automaticamente (PowerShell)
+
+### Scripts de Ajuda
+- `scripts/copy_images.bat` - Copia imagens automaticamente (Windows)
+- `scripts/copy_images.ps1` - Copia imagens automaticamente (PowerShell)
+
+### URLs de Acesso
+- Local: `http://localhost:3001/images/produtos/nome.jpg`
+- Frontend: `/images/produtos/nome.jpg`
+
+## �🔐 Autenticação
 
 O sistema utiliza JWT (JSON Web Tokens) para autenticação. Inclua o token no header:
 

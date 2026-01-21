@@ -4,7 +4,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import pool from './config/database.js';
 
 // Importar rotas
@@ -74,6 +74,9 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
+
+// Servir arquivos estáticos da pasta public
+app.use('/images', express.static(join(__dirname, 'public/images')));
 
 // Middleware de tratamento de erros
 app.use((err, req, res, next) => {
