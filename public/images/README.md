@@ -1,57 +1,62 @@
 # Sistema de Imagens dos Produtos
 
-## Status Atual ✅
+## Status Atual ⚠️
 
-**Imagens verificadas e scripts atualizados!**
+**Scripts executados, mas imagens não aparecem no frontend**
 
-- ✅ **60 imagens** encontradas na pasta `produtos/`
-- ✅ **60 produtos** mapeados corretamente nos scripts SQL
-- ✅ **Produtos renomeados** para corresponder às imagens (AGUA → AGUA garrafa 500 ml)
+- ✅ **Scripts SQL** executados sem erros
+- ✅ **60 imagens** na pasta `produtos/`
+- ❌ **Imagens não aparecem** na lista de produtos
+- ❌ **Campo URL vazio** no detalhe dos produtos
+
+## 🔍 Diagnóstico
+
+### Scripts de Verificação
+1. **`202601200004_diagnostico_imagens.sql`** - Verifica estado das imagens
+2. **`202601200005_verificar_produtos.sql`** - Verifica nomes dos produtos
+3. **`202601200006_forcar_atualizacao.sql`** - Força atualização das imagens
+
+### Possíveis Problemas
+- Trigger não está ativando
+- Nomes dos produtos não correspondem
+- Imagens ainda marcadas como 'referencia'
+- Backend não está rodando
+
+## 🛠️ Solução de Problemas
+
+### 1. Execute os Scripts de Diagnóstico
+```sql
+-- Verificar estado atual
+\i scc-database/202601200004_diagnostico_imagens.sql
+
+-- Verificar nomes dos produtos
+\i scc-database/202601200005_verificar_produtos.sql
+```
+
+### 2. Se as Imagens Não Aparecem
+```sql
+-- Forçar atualização
+\i scc-database/202601200006_forcar_atualizacao.sql
+```
+
+### 3. Verificar Backend
+- Certifique-se que o backend está rodando: `npm start`
+- Teste URL: `http://localhost:3001/images/produtos/COCA%20COLA%20350ml.png`
 
 ## Scripts SQL Disponíveis
 
-### 1. Script de Renomeação (Executar Primeiro)
-Arquivo: `scc-database/202601200003_renomear_produtos.sql`
-- Renomeia "AGUA" → "AGUA garrafa 500 ml"
-- Renomeia "AGUA COM GAS" → "AGUA COM GAS garrafa 500ml"
-- Execute este primeiro
+### 1. Renomeação (Já executado)
+`202601200003_renomear_produtos.sql`
 
-### 2. Script de Atualização de Imagens (Executar Depois)
-Arquivo: `scc-database/202601200001_atualizar_urls_imagens.sql`
-- Mapeia todas as 60 imagens para os produtos
-- Execute este depois da renomeação
+### 2. Atualização de Imagens (Já executado)
+`202601200001_atualizar_urls_imagens.sql`
 
-## Como Executar
+### 3. Diagnóstico
+`202601200004_diagnostico_imagens.sql`
+`202601200005_verificar_produtos.sql`
 
-1. **Execute o script de renomeação:**
-   ```sql
-   -- No PostgreSQL
-   \i scc-database/202601200003_renomear_produtos.sql
-   ```
+### 4. Solução de Emergência
+`202601200006_forcar_atualizacao.sql`
 
-2. **Execute o script de imagens:**
-   ```sql
-   \i scc-database/202601200001_atualizar_urls_imagens.sql
-   ```
-
-3. **Verifique no frontend:**
-   - Todas as 60 imagens aparecerão na lista de produtos
-   - Incluindo Coca Cola, Heineken, águas, etc.
-
-## Produtos Sem Imagens
-
-Os seguintes produtos não têm imagens correspondentes:
-- `AMENDOIN`
-- `PF/COSTELA`
-- `PF/LINGUICA`
-
-Você pode adicionar imagens para estes produtos posteriormente se desejar.
-
-## Formatos Suportados
-- PNG (atual)
-- JPG/JPEG
-- WebP
-
-## URLs de Acesso
-- Backend: `http://localhost:3001/images/produtos/nome.png`
-- Frontend: `/images/produtos/nome.png`
+## Resultado Esperado
+Após executar os scripts corretos, **60 produtos** terão imagens visíveis no frontend.
