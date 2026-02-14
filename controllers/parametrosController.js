@@ -10,9 +10,25 @@ const parametrosController = {
       );
       
       if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'Parâmetros não encontrados'
+        // Se não existir, retornar padrões
+        return res.json({
+          success: true,
+          data: {
+            id: null,
+            autostart: true,
+            modo_exibicao: 'pedidos-propaganda',
+            intervalo_exibicao_seg: 10,
+            exibir_numero_pedido: true,
+            exibir_observacao_pedido: true,
+            cor_fundo_principal: '#000000',
+            cor_texto_principal: '#FFFFFF',
+            cor_destaque_numero: '#FFD700',
+            imagem_fundo_id: null,
+            video_propaganda_id: null,
+            som_notificacao_novos_pedidos_id: null,
+            ativa: true,
+            atualizado_por_email: null
+          }
         });
       }
       
@@ -34,19 +50,18 @@ const parametrosController = {
   async update(req, res) {
     try {
       const {
-        iniciar_com_android,
+        autostart,
         modo_exibicao,
-        tipo_fundo,
-        cor_fundo,
-        caminho_imagem_fundo,
-        cor_fonte,
-        nome_fonte,
-        tempo_exibicao_pedido,
-        intervalo_consulta_pedidos,
-        notificar_som,
-        caminho_som_notificacao,
-        tempo_inicio_propaganda,
-        ordem_imagens_propaganda
+        intervalo_exibicao_seg,
+        exibir_numero_pedido,
+        exibir_observacao_pedido,
+        cor_fundo_principal,
+        cor_texto_principal,
+        cor_destaque_numero,
+        imagem_fundo_id,
+        video_propaganda_id,
+        som_notificacao_novos_pedidos_id,
+        ativa
       } = req.body;
       
       // Buscar parâmetros atuais para auditoria
@@ -68,57 +83,62 @@ const parametrosController = {
       const values = [];
       let paramIndex = 1;
       
-      if (iniciar_com_android !== undefined) {
-        updates.push(`iniciar_com_android = $${paramIndex++}`);
-        values.push(iniciar_com_android);
+      if (autostart !== undefined) {
+        updates.push(`autostart = $${paramIndex++}`);
+        values.push(autostart);
       }
       if (modo_exibicao !== undefined) {
         updates.push(`modo_exibicao = $${paramIndex++}`);
         values.push(modo_exibicao);
       }
-      if (tipo_fundo !== undefined) {
-        updates.push(`tipo_fundo = $${paramIndex++}`);
-        values.push(tipo_fundo);
+      if (intervalo_exibicao_seg !== undefined) {
+        updates.push(`intervalo_exibicao_seg = $${paramIndex++}`);
+        values.push(intervalo_exibicao_seg);
       }
-      if (cor_fundo !== undefined) {
-        updates.push(`cor_fundo = $${paramIndex++}`);
-        values.push(cor_fundo);
+      if (exibir_numero_pedido !== undefined) {
+        updates.push(`exibir_numero_pedido = $${paramIndex++}`);
+        values.push(exibir_numero_pedido);
       }
-      if (caminho_imagem_fundo !== undefined) {
-        updates.push(`caminho_imagem_fundo = $${paramIndex++}`);
-        values.push(caminho_imagem_fundo);
+      if (exibir_observacao_pedido !== undefined) {
+        updates.push(`exibir_observacao_pedido = $${paramIndex++}`);
+        values.push(exibir_observacao_pedido);
       }
-      if (cor_fonte !== undefined) {
-        updates.push(`cor_fonte = $${paramIndex++}`);
-        values.push(cor_fonte);
+      if (cor_fundo_principal !== undefined) {
+        updates.push(`cor_fundo_principal = $${paramIndex++}`);
+        values.push(cor_fundo_principal);
       }
-      if (nome_fonte !== undefined) {
-        updates.push(`nome_fonte = $${paramIndex++}`);
-        values.push(nome_fonte);
+      if (cor_texto_principal !== undefined) {
+        updates.push(`cor_texto_principal = $${paramIndex++}`);
+        values.push(cor_texto_principal);
       }
-      if (tempo_exibicao_pedido !== undefined) {
-        updates.push(`tempo_exibicao_pedido = $${paramIndex++}`);
-        values.push(tempo_exibicao_pedido);
+      if (cor_destaque_numero !== undefined) {
+        updates.push(`cor_destaque_numero = $${paramIndex++}`);
+        values.push(cor_destaque_numero);
       }
-      if (intervalo_consulta_pedidos !== undefined) {
-        updates.push(`intervalo_consulta_pedidos = $${paramIndex++}`);
-        values.push(intervalo_consulta_pedidos);
+      if (imagem_fundo_id !== undefined) {
+        updates.push(`imagem_fundo_id = $${paramIndex++}`);
+        values.push(imagem_fundo_id);
       }
-      if (notificar_som !== undefined) {
-        updates.push(`notificar_som = $${paramIndex++}`);
-        values.push(notificar_som);
+      if (video_propaganda_id !== undefined) {
+        updates.push(`video_propaganda_id = $${paramIndex++}`);
+        values.push(video_propaganda_id);
       }
-      if (caminho_som_notificacao !== undefined) {
-        updates.push(`caminho_som_notificacao = $${paramIndex++}`);
-        values.push(caminho_som_notificacao);
+      if (som_notificacao_novos_pedidos_id !== undefined) {
+        updates.push(`som_notificacao_novos_pedidos_id = $${paramIndex++}`);
+        values.push(som_notificacao_novos_pedidos_id);
       }
-      if (tempo_inicio_propaganda !== undefined) {
-        updates.push(`tempo_inicio_propaganda = $${paramIndex++}`);
-        values.push(tempo_inicio_propaganda);
+      if (ativa !== undefined) {
+        updates.push(`ativa = $${paramIndex++}`);
+        values.push(ativa);
       }
-      if (ordem_imagens_propaganda !== undefined) {
-        updates.push(`ordem_imagens_propaganda = $${paramIndex++}`);
-        values.push(ordem_imagens_propaganda);
+      
+      // Se nenhum campo foi atualizado
+      if (updates.length === 0) {
+        return res.json({
+          success: true,
+          data: oldData.rows[0],
+          message: 'Nenhuma alteração realizada'
+        });
       }
       
       // Adicionar email do usuário que fez a alteração
