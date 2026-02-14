@@ -1,5 +1,5 @@
-const pool = require('../config/database');
-const { auditService } = require('../services/auditService');
+import pool from '../config/database.js';
+import { auditService } from '../services/auditService.js';
 
 const pedidosController = {
   // Listar todos os pedidos (com filtro de últimas 24h opcional)
@@ -241,4 +241,4 @@ const pedidosController = {
   }
 };
 
-module.exports = pedidosController;
+export default pedidosController;

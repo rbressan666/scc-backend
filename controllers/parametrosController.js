@@ -1,5 +1,5 @@
-const pool = require('../config/database');
-const { auditService } = require('../services/auditService');
+import pool from '../config/database.js';
+import { auditService } from '../services/auditService.js';
 
 const parametrosController = {
   // Buscar parâmetros atuais
@@ -217,4 +217,4 @@ const parametrosController = {
   }
 };
 
-module.exports = parametrosController;
+export default parametrosController;

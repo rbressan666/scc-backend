@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import pedidosController from '../controllers/pedidosController.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+
 const router = express.Router();
-const pedidosController = require('../controllers/pedidosController');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 // Todas as rotas requerem autenticação de admin
 router.use(authenticateToken);
@@ -22,4 +23,4 @@ router.put('/:id', pedidosController.update);
 // DELETE /api/pedidos/:id - Excluir pedido (soft delete)
 router.delete('/:id', pedidosController.delete);
 
-module.exports = router;
+export default router;
