@@ -27,6 +27,8 @@ import scheduleRoutes from './routes/schedule.js';
 import planningRoutes from './routes/planning.js';
 import adminRoutes from './routes/admin.js';
 import statutesRoutes from './routes/statutes.js';
+import pedidosRoutes from './routes/pedidos.js';
+import parametrosPropagandaRoutes from './routes/parametros-propaganda.js';
 // Importar serviços
 import { qrCodeService } from './services/qrCodeService.js';
 import { auditMiddleware } from './middleware/audit.js';
@@ -121,6 +123,8 @@ app.use('/api/schedule', scheduleRoutes);
 app.use('/api/planning', planningRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/statutes', statutesRoutes);
+app.use('/api/pedidos', pedidosRoutes);
+app.use('/api/parametros-propaganda', parametrosPropagandaRoutes);
 // notifications routes are already mounted above
 
 // Test endpoint (optional) to verify email sending; enable by setting ENABLE_TEST_ROUTES=true
