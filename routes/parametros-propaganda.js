@@ -23,4 +23,7 @@ router.post('/midia/upload-imagem', parametrosController.uploadImagemPropaganda)
 // GET /api/parametros-propaganda/midia - Listar mídias propaganda
 router.get('/midia', parametrosController.listMidias);
 
+// PUT /api/parametros-propaganda/midia/reorder - Reordenar mídias propaganda
+router.put('/midia/reorder', parametrosController.reorderMidias);
+
 export default router;

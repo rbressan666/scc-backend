@@ -282,11 +282,18 @@ const parametrosController = {
       await fs.writeFile(filePath, buffer);
 
       const urlArquivo = `/images/propaganda/${fileName}`;
+      const ordemRes = await pool.query(
+        `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima_ordem
+         FROM midia_propaganda
+         WHERE deletado_em IS NULL AND tipo = 'imagem'`
+      );
+      const proximaOrdem = Number(ordemRes.rows[0]?.proxima_ordem ?? 0);
+
       const result = await pool.query(
-        `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa)
-         VALUES ($1, 'imagem', $2, $3, $4, true)
+        `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa, ordem)
+         VALUES ($1, 'imagem', $2, $3, $4, true, $5)
          RETURNING *`,
-        [nome || fileName, urlArquivo, buffer.length, mimeType]
+        [nome || fileName, urlArquivo, buffer.length, mimeType, proximaOrdem]
       );
 
       res.status(201).json({
@@ -334,6 +341,56 @@ const parametrosController = {
         message: 'Erro ao listar mídias de propaganda',
         error: error.message
       });
+    }
+  },
+
+  // Reordenar mídias de propaganda
+  async reorderMidias(req, res) {
+    const client = await pool.connect();
+    try {
+      const { orderedIds } = req.body;
+
+      if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'orderedIds deve ser um array com ao menos um ID'
+        });
+      }
+
+      await client.query('BEGIN');
+
+      for (let i = 0; i < orderedIds.length; i += 1) {
+        await client.query(
+          `UPDATE midia_propaganda
+           SET ordem = $1, updated_at = NOW()
+           WHERE id = $2 AND deletado_em IS NULL`,
+          [i, orderedIds[i]]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      const result = await pool.query(
+        `SELECT * FROM midia_propaganda
+         WHERE deletado_em IS NULL
+         ORDER BY ordem ASC, created_at DESC`
+      );
+
+      res.json({
+        success: true,
+        data: result.rows,
+        message: 'Ordem das mídias atualizada com sucesso'
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Erro ao reordenar mídias de propaganda:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao reordenar mídias de propaganda',
+        error: error.message
+      });
+    } finally {
+      client.release();
     }
   }
 };
