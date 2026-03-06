@@ -360,7 +360,7 @@ const parametrosController = {
 
       if (tipo) {
         params.push(tipo);
-        query += ` AND tipo = $${params.length}`;
+        query += ` AND LOWER(TRIM(tipo)) = LOWER(TRIM($${params.length}))`;
       }
 
       query += ordemExists ? ' ORDER BY ordem ASC, created_at DESC' : ' ORDER BY created_at DESC';
