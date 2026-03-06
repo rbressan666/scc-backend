@@ -98,7 +98,7 @@ const pedidosController = {
         `INSERT INTO pedidos (numero_pedido, observacao, usuario_email)
          VALUES ($1, $2, $3)
          RETURNING *`,
-        [numero_pedido, observacao, usuario_email]
+        [numero_pedido, observacao, usuario_email || req.user?.email || 'SCC-Pedido']
       );
       
       // Auditoria

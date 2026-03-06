@@ -1,5 +1,11 @@
 import pool from '../config/database.js';
 import { auditService } from '../services/auditService.js';
+import { promises as fs } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const parametrosController = {
   // Buscar parâmetros atuais
@@ -231,6 +237,101 @@ const parametrosController = {
       res.status(500).json({
         success: false,
         message: 'Erro ao buscar histórico de alterações',
+        error: error.message
+      });
+    }
+  },
+
+  // Upload de imagem de propaganda (base64)
+  async uploadImagemPropaganda(req, res) {
+    try {
+      const { imageBase64, nome } = req.body;
+
+      if (!imageBase64 || typeof imageBase64 !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'imageBase64 é obrigatório'
+        });
+      }
+
+      const match = imageBase64.match(/^data:(image\/(png|jpeg|jpg));base64,(.+)$/i);
+      if (!match) {
+        return res.status(400).json({
+          success: false,
+          message: 'Formato inválido. Use PNG/JPG/JPEG em base64'
+        });
+      }
+
+      const mimeType = match[1].toLowerCase();
+      const base64Data = match[3];
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      if (buffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({
+          success: false,
+          message: 'Imagem muito grande (máximo 5MB)'
+        });
+      }
+
+      const ext = mimeType.includes('png') ? 'png' : 'jpg';
+      const fileName = `propaganda_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const propagandaDir = join(__dirname, '..', 'public', 'images', 'propaganda');
+      const filePath = join(propagandaDir, fileName);
+
+      await fs.mkdir(propagandaDir, { recursive: true });
+      await fs.writeFile(filePath, buffer);
+
+      const urlArquivo = `/images/propaganda/${fileName}`;
+      const result = await pool.query(
+        `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa)
+         VALUES ($1, 'imagem', $2, $3, $4, true)
+         RETURNING *`,
+        [nome || fileName, urlArquivo, buffer.length, mimeType]
+      );
+
+      res.status(201).json({
+        success: true,
+        data: result.rows[0],
+        message: 'Imagem de propaganda enviada com sucesso'
+      });
+    } catch (error) {
+      console.error('Erro ao fazer upload da imagem de propaganda:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao fazer upload da imagem de propaganda',
+        error: error.message
+      });
+    }
+  },
+
+  // Listar mídias de propaganda
+  async listMidias(req, res) {
+    try {
+      const { tipo } = req.query;
+      const params = [];
+      let query = `
+        SELECT * FROM midia_propaganda
+        WHERE deletado_em IS NULL
+      `;
+
+      if (tipo) {
+        params.push(tipo);
+        query += ` AND tipo = $${params.length}`;
+      }
+
+      query += ' ORDER BY ordem ASC, created_at DESC';
+
+      const result = await pool.query(query, params);
+
+      res.json({
+        success: true,
+        data: result.rows
+      });
+    } catch (error) {
+      console.error('Erro ao listar mídias de propaganda:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao listar mídias de propaganda',
         error: error.message
       });
     }
