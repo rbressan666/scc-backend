@@ -6,6 +6,12 @@ const pedidosController = {
   async getAll(req, res) {
     try {
       const { ultimas24h } = req.query;
+
+      // Regra de vigência: remover pedidos com mais de 5 dias corridos
+      await pool.query(
+        `DELETE FROM pedidos
+         WHERE data_hora < NOW() - INTERVAL '5 days'`
+      );
       
       let query = `
         SELECT * FROM pedidos 
