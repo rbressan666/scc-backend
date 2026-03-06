@@ -29,4 +29,10 @@ router.get('/midia/diagnostico', parametrosController.diagnosticoMidias);
 // PUT /api/parametros-propaganda/midia/reorder - Reordenar mídias propaganda
 router.put('/midia/reorder', parametrosController.reorderMidias);
 
+// DELETE /api/parametros-propaganda/midia/:id - Excluir mídia propaganda
+router.delete('/midia/:id', parametrosController.deleteMidia);
+
+// PATCH /api/parametros-propaganda/midia/:id/ativa - Incluir/remover da sequência
+router.patch('/midia/:id/ativa', parametrosController.setMidiaAtiva);
+
 export default router;

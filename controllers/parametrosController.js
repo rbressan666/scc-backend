@@ -444,6 +444,145 @@ const parametrosController = {
     }
   },
 
+  // Excluir mídia de propaganda (soft delete + tentativa de remover arquivo)
+  async deleteMidia(req, res) {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params;
+      const hasDeletadoEm = await hasColumn('midia_propaganda', 'deletado_em');
+      const hasAtiva = await hasColumn('midia_propaganda', 'ativa');
+      const hasUpdatedAt = await hasColumn('midia_propaganda', 'updated_at');
+
+      const mediaRes = await client.query(
+        `SELECT id, url_arquivo, tipo
+         FROM midia_propaganda
+         WHERE id = $1`,
+        [id]
+      );
+
+      if (mediaRes.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Mídia não encontrada'
+        });
+      }
+
+      const midia = mediaRes.rows[0];
+
+      await client.query('BEGIN');
+
+      const updateSet = [];
+      if (hasDeletadoEm) updateSet.push('deletado_em = NOW()');
+      if (hasAtiva) updateSet.push('ativa = false');
+      if (hasUpdatedAt) updateSet.push('updated_at = NOW()');
+
+      if (updateSet.length === 0) {
+        await client.query('DELETE FROM midia_propaganda WHERE id = $1', [id]);
+      } else {
+        await client.query(
+          `UPDATE midia_propaganda
+           SET ${updateSet.join(', ')}
+           WHERE id = $1`,
+          [id]
+        );
+      }
+
+      await client.query(
+        `UPDATE parametros_app_pedidos_propaganda
+         SET imagem_fundo_id = NULL,
+             updated_at = NOW()
+         WHERE imagem_fundo_id = $1`,
+        [id]
+      );
+
+      await client.query(
+        `UPDATE parametros_app_pedidos_propaganda
+         SET video_propaganda_id = NULL,
+             updated_at = NOW()
+         WHERE video_propaganda_id = $1`,
+        [id]
+      );
+
+      await client.query('COMMIT');
+
+      if (midia.url_arquivo?.startsWith('/images/')) {
+        const localPath = join(__dirname, '..', 'public', midia.url_arquivo.replace('/images/', 'images/'));
+        try {
+          await fs.unlink(localPath);
+        } catch {
+          // ignora se arquivo já não existir
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Mídia excluída com sucesso'
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Erro ao excluir mídia de propaganda:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao excluir mídia de propaganda',
+        error: error.message
+      });
+    } finally {
+      client.release();
+    }
+  },
+
+  // Ativar/desativar mídia na sequência de exibição
+  async setMidiaAtiva(req, res) {
+    try {
+      const { id } = req.params;
+      const { ativa } = req.body;
+
+      if (typeof ativa !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: 'Campo ativa deve ser boolean'
+        });
+      }
+
+      const hasAtiva = await hasColumn('midia_propaganda', 'ativa');
+      if (!hasAtiva) {
+        return res.status(400).json({
+          success: false,
+          message: 'Coluna ativa não existe em midia_propaganda'
+        });
+      }
+
+      const hasUpdatedAt = await hasColumn('midia_propaganda', 'updated_at');
+      const result = await pool.query(
+        `UPDATE midia_propaganda
+         SET ativa = $1${hasUpdatedAt ? ', updated_at = NOW()' : ''}
+         WHERE id = $2
+         RETURNING *`,
+        [ativa, id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Mídia não encontrada'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: result.rows[0],
+        message: ativa ? 'Imagem incluída na sequência' : 'Imagem removida da sequência'
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar status ativo da mídia:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro ao atualizar status da mídia',
+        error: error.message
+      });
+    }
+  },
+
   // Diagnóstico de mídia propaganda (DB + arquivo local)
   async diagnosticoMidias(req, res) {
     try {
