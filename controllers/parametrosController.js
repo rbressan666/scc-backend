@@ -7,6 +7,19 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const hasColumn = async (tableName, columnName) => {
+  const result = await pool.query(
+    `SELECT 1
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = $1
+       AND column_name = $2
+     LIMIT 1`,
+    [tableName, columnName]
+  );
+  return result.rows.length > 0;
+};
+
 const parametrosController = {
   // Buscar parâmetros atuais
   async get(req, res) {
@@ -282,19 +295,32 @@ const parametrosController = {
       await fs.writeFile(filePath, buffer);
 
       const urlArquivo = `/images/propaganda/${fileName}`;
-      const ordemRes = await pool.query(
-        `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima_ordem
-         FROM midia_propaganda
-         WHERE deletado_em IS NULL AND tipo = 'imagem'`
-      );
-      const proximaOrdem = Number(ordemRes.rows[0]?.proxima_ordem ?? 0);
+      const ordemExists = await hasColumn('midia_propaganda', 'ordem');
+      const deletadoEmExists = await hasColumn('midia_propaganda', 'deletado_em');
 
-      const result = await pool.query(
-        `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa, ordem)
-         VALUES ($1, 'imagem', $2, $3, $4, true, $5)
-         RETURNING *`,
-        [nome || fileName, urlArquivo, buffer.length, mimeType, proximaOrdem]
-      );
+      let result;
+      if (ordemExists) {
+        const ordemRes = await pool.query(
+          `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima_ordem
+           FROM midia_propaganda
+           WHERE tipo = 'imagem' ${deletadoEmExists ? 'AND deletado_em IS NULL' : ''}`
+        );
+        const proximaOrdem = Number(ordemRes.rows[0]?.proxima_ordem ?? 0);
+
+        result = await pool.query(
+          `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa, ordem)
+           VALUES ($1, 'imagem', $2, $3, $4, true, $5)
+           RETURNING *`,
+          [nome || fileName, urlArquivo, buffer.length, mimeType, proximaOrdem]
+        );
+      } else {
+        result = await pool.query(
+          `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa)
+           VALUES ($1, 'imagem', $2, $3, $4, true)
+           RETURNING *`,
+          [nome || fileName, urlArquivo, buffer.length, mimeType]
+        );
+      }
 
       res.status(201).json({
         success: true,
@@ -316,17 +342,23 @@ const parametrosController = {
     try {
       const { tipo } = req.query;
       const params = [];
+      const deletadoEmExists = await hasColumn('midia_propaganda', 'deletado_em');
+      const ordemExists = await hasColumn('midia_propaganda', 'ordem');
       let query = `
         SELECT * FROM midia_propaganda
-        WHERE deletado_em IS NULL
+        WHERE 1=1
       `;
+
+      if (deletadoEmExists) {
+        query += ' AND deletado_em IS NULL';
+      }
 
       if (tipo) {
         params.push(tipo);
         query += ` AND tipo = $${params.length}`;
       }
 
-      query += ' ORDER BY ordem ASC, created_at DESC';
+      query += ordemExists ? ' ORDER BY ordem ASC, created_at DESC' : ' ORDER BY created_at DESC';
 
       const result = await pool.query(query, params);
 
@@ -349,6 +381,14 @@ const parametrosController = {
     const client = await pool.connect();
     try {
       const { orderedIds } = req.body;
+
+      const ordemExists = await hasColumn('midia_propaganda', 'ordem');
+      if (!ordemExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'A coluna ordem não existe em midia_propaganda. Aplique a migration antes de reordenar.'
+        });
+      }
 
       if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
         return res.status(400).json({
