@@ -322,9 +322,14 @@ const parametrosController = {
         );
       }
 
+      const urlPublica = `${req.protocol}://${req.get('host')}${urlArquivo}`;
+
       res.status(201).json({
         success: true,
-        data: result.rows[0],
+        data: {
+          ...result.rows[0],
+          url_publica: urlPublica
+        },
         message: 'Imagem de propaganda enviada com sucesso'
       });
     } catch (error) {
@@ -362,9 +367,14 @@ const parametrosController = {
 
       const result = await pool.query(query, params);
 
+      const data = result.rows.map((row) => ({
+        ...row,
+        url_publica: `${req.protocol}://${req.get('host')}${row.url_arquivo}`
+      }));
+
       res.json({
         success: true,
-        data: result.rows
+        data
       });
     } catch (error) {
       console.error('Erro ao listar mídias de propaganda:', error);
@@ -431,6 +441,50 @@ const parametrosController = {
       });
     } finally {
       client.release();
+    }
+  },
+
+  // Diagnóstico de mídia propaganda (DB + arquivo local)
+  async diagnosticoMidias(req, res) {
+    try {
+      const result = await pool.query(
+        `SELECT id, nome, tipo, url_arquivo, ordem, created_at
+         FROM midia_propaganda
+         ORDER BY created_at DESC
+         LIMIT 30`
+      );
+
+      const itens = await Promise.all(result.rows.map(async (row) => {
+        let arquivoExiste = null;
+        if (row.url_arquivo?.startsWith('/images/')) {
+          const localPath = join(__dirname, '..', 'public', row.url_arquivo.replace('/images/', 'images/'));
+          try {
+            await fs.access(localPath);
+            arquivoExiste = true;
+          } catch {
+            arquivoExiste = false;
+          }
+        }
+
+        return {
+          ...row,
+          url_publica: `${req.protocol}://${req.get('host')}${row.url_arquivo}`,
+          arquivo_existe_no_container: arquivoExiste
+        };
+      }));
+
+      res.json({
+        success: true,
+        total: itens.length,
+        data: itens
+      });
+    } catch (error) {
+      console.error('Erro no diagnóstico de mídias:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro no diagnóstico de mídias',
+        error: error.message
+      });
     }
   }
 };
