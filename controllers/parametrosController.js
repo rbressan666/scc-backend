@@ -3,9 +3,18 @@ import { auditService } from '../services/auditService.js';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import supabaseStorageService from '../services/supabaseStorageService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const buildPublicUrl = (req, urlArquivo) => {
+  if (!urlArquivo) return null;
+  if (String(urlArquivo).startsWith('http://') || String(urlArquivo).startsWith('https://')) {
+    return urlArquivo;
+  }
+  return `${req.protocol}://${req.get('host')}${urlArquivo}`;
+};
 
 const hasColumn = async (tableName, columnName) => {
   const result = await pool.query(
@@ -267,34 +276,12 @@ const parametrosController = {
         });
       }
 
-      const match = imageBase64.match(/^data:(image\/(png|jpeg|jpg));base64,(.+)$/i);
-      if (!match) {
-        return res.status(400).json({
-          success: false,
-          message: 'Formato inválido. Use PNG/JPG/JPEG em base64'
-        });
-      }
+      const uploadResult = await supabaseStorageService.uploadImageBase64({
+        imageBase64,
+        originalName: nome
+      });
 
-      const mimeType = match[1].toLowerCase();
-      const base64Data = match[3];
-      const buffer = Buffer.from(base64Data, 'base64');
-
-      if (buffer.length > 5 * 1024 * 1024) {
-        return res.status(400).json({
-          success: false,
-          message: 'Imagem muito grande (máximo 5MB)'
-        });
-      }
-
-      const ext = mimeType.includes('png') ? 'png' : 'jpg';
-      const fileName = `propaganda_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const propagandaDir = join(__dirname, '..', 'public', 'images', 'propaganda');
-      const filePath = join(propagandaDir, fileName);
-
-      await fs.mkdir(propagandaDir, { recursive: true });
-      await fs.writeFile(filePath, buffer);
-
-      const urlArquivo = `/images/propaganda/${fileName}`;
+      const urlArquivo = uploadResult.url;
       const ordemExists = await hasColumn('midia_propaganda', 'ordem');
       const deletadoEmExists = await hasColumn('midia_propaganda', 'deletado_em');
 
@@ -311,18 +298,18 @@ const parametrosController = {
           `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa, ordem)
            VALUES ($1, 'imagem', $2, $3, $4, true, $5)
            RETURNING *`,
-          [nome || fileName, urlArquivo, buffer.length, mimeType, proximaOrdem]
+          [nome || 'Imagem propaganda', urlArquivo, uploadResult.size, uploadResult.mimeType, proximaOrdem]
         );
       } else {
         result = await pool.query(
           `INSERT INTO midia_propaganda (nome, tipo, url_arquivo, tamanho_bytes, mime_type, ativa)
            VALUES ($1, 'imagem', $2, $3, $4, true)
            RETURNING *`,
-          [nome || fileName, urlArquivo, buffer.length, mimeType]
+          [nome || 'Imagem propaganda', urlArquivo, uploadResult.size, uploadResult.mimeType]
         );
       }
 
-      const urlPublica = `${req.protocol}://${req.get('host')}${urlArquivo}`;
+      const urlPublica = buildPublicUrl(req, urlArquivo);
 
       res.status(201).json({
         success: true,
@@ -369,7 +356,7 @@ const parametrosController = {
 
       const data = result.rows.map((row) => ({
         ...row,
-        url_publica: `${req.protocol}://${req.get('host')}${row.url_arquivo}`
+        url_publica: buildPublicUrl(req, row.url_arquivo)
       }));
 
       res.json({
@@ -449,9 +436,6 @@ const parametrosController = {
     const client = await pool.connect();
     try {
       const { id } = req.params;
-      const hasDeletadoEm = await hasColumn('midia_propaganda', 'deletado_em');
-      const hasAtiva = await hasColumn('midia_propaganda', 'ativa');
-      const hasUpdatedAt = await hasColumn('midia_propaganda', 'updated_at');
 
       const mediaRes = await client.query(
         `SELECT id, url_arquivo, tipo
@@ -471,21 +455,7 @@ const parametrosController = {
 
       await client.query('BEGIN');
 
-      const updateSet = [];
-      if (hasDeletadoEm) updateSet.push('deletado_em = NOW()');
-      if (hasAtiva) updateSet.push('ativa = false');
-      if (hasUpdatedAt) updateSet.push('updated_at = NOW()');
-
-      if (updateSet.length === 0) {
-        await client.query('DELETE FROM midia_propaganda WHERE id = $1', [id]);
-      } else {
-        await client.query(
-          `UPDATE midia_propaganda
-           SET ${updateSet.join(', ')}
-           WHERE id = $1`,
-          [id]
-        );
-      }
+      await client.query('DELETE FROM midia_propaganda WHERE id = $1', [id]);
 
       await client.query(
         `UPDATE parametros_app_pedidos_propaganda
@@ -505,18 +475,23 @@ const parametrosController = {
 
       await client.query('COMMIT');
 
-      if (midia.url_arquivo?.startsWith('/images/')) {
-        const localPath = join(__dirname, '..', 'public', midia.url_arquivo.replace('/images/', 'images/'));
-        try {
-          await fs.unlink(localPath);
-        } catch {
-          // ignora se arquivo já não existir
+      try {
+        await supabaseStorageService.removeByUrl(midia.url_arquivo);
+      } catch {
+        // fallback para legado local
+        if (midia.url_arquivo?.startsWith('/images/')) {
+          const localPath = join(__dirname, '..', 'public', midia.url_arquivo.replace('/images/', 'images/'));
+          try {
+            await fs.unlink(localPath);
+          } catch {
+            // ignora se arquivo já não existir
+          }
         }
       }
 
       res.json({
         success: true,
-        message: 'Mídia excluída com sucesso'
+        message: 'Mídia removida em definitivo com sucesso'
       });
     } catch (error) {
       await client.query('ROLLBACK');
@@ -607,7 +582,7 @@ const parametrosController = {
 
         return {
           ...row,
-          url_publica: `${req.protocol}://${req.get('host')}${row.url_arquivo}`,
+          url_publica: buildPublicUrl(req, row.url_arquivo),
           arquivo_existe_no_container: arquivoExiste
         };
       }));
