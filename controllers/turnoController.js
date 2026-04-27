@@ -276,7 +276,14 @@ export const getTurnoDetailWithComparison = async (req, res) => {
     try {
         // 1. Buscar informações do turno
         const turnoResult = await pool.query(
-            'SELECT * FROM turnos WHERE id = $1',
+            `SELECT 
+                t.*,
+                u_abertura.nome as usuario_abertura_nome,
+                u_fechamento.nome as usuario_fechamento_nome
+             FROM turnos t
+             LEFT JOIN usuarios u_abertura ON t.usuario_abertura = u_abertura.id
+             LEFT JOIN usuarios u_fechamento ON t.usuario_fechamento = u_fechamento.id
+             WHERE t.id = $1`,
             [id]
         );
 
@@ -289,38 +296,22 @@ export const getTurnoDetailWithComparison = async (req, res) => {
 
         const turno = turnoResult.rows[0];
 
-        // 2. Buscar as duas últimas contagens com saldo
+        // 2. Buscar as contagens atuais do turno
         const contagens = await pool.query(`
-            WITH ranked_contagens AS (
-              SELECT 
-                c.id,
-                c.turno_id,
-                c.data_inicio,
-                c.tipo_contagem,
-                c.status,
-                ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.data_inicio DESC) AS rn
-              FROM contagens c
-              WHERE c.turno_id = $1
-                AND c.status IN ('pre_fechada', 'fechada', 'aberta')
-            )
             SELECT 
               p.id AS produto_id,
               p.nome AS produto_nome,
               vp.id AS variacao_id,
               vp.nome AS variacao_nome,
-              MAX(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END) AS contagem_anterior,
-              MAX(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END) AS contagem_atual,
-              (MAX(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END) - 
-               MAX(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END)) AS saldo,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_anterior,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_atual,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
-              COUNT(CASE WHEN rc.rn = 2 THEN ic.id END) > 0 AS tem_anterior
-            FROM ranked_contagens rc
+              COALESCE(SUM(ic.quantidade_convertida), 0) AS contagem_atual,
+              MAX(rc.data_inicio) AS data_atual,
+              MAX(rc.status) AS status_contagem_atual
+            FROM contagens rc
             LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
             LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
             LEFT JOIN produtos p ON p.id = vp.id_produto
-            WHERE rc.rn <= 2
+            WHERE rc.turno_id = $1
+              AND rc.status IN ('pre_fechada', 'fechada', 'aberta')
             GROUP BY p.id, p.nome, vp.id, vp.nome
             ORDER BY p.nome ASC
         `, [id]);
