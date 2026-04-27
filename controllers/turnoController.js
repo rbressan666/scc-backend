@@ -295,10 +295,10 @@ export const getTurnoDetailWithComparison = async (req, res) => {
               SELECT 
                 c.id,
                 c.turno_id,
-                c.inicio_em,
+                c.data_inicio,
                 c.tipo_contagem,
                 c.status,
-                ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.inicio_em DESC) AS rn
+                ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.data_inicio DESC) AS rn
               FROM contagens c
               WHERE c.turno_id = $1
                 AND c.status IN ('pre_fechada', 'fechada', 'aberta')
@@ -312,8 +312,8 @@ export const getTurnoDetailWithComparison = async (req, res) => {
               MAX(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END) AS contagem_atual,
               (MAX(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END) - 
                MAX(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END)) AS saldo,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.inicio_em END) AS data_anterior,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.inicio_em END) AS data_atual,
+              MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_atual,
               MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
               MAX(CASE WHEN rc.rn = 2 THEN ic.id END) IS NOT NULL AS tem_anterior
             FROM ranked_contagens rc
