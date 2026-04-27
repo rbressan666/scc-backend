@@ -25,7 +25,7 @@
 --     MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_anterior,
 --     MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_atual,
 --     MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
---     MAX(CASE WHEN rc.rn = 2 THEN ic.id END) IS NOT NULL AS tem_anterior
+    COUNT(CASE WHEN rc.rn = 2 THEN ic.id END) > 0 AS tem_anterior
 --   FROM ranked_contagens rc
 --   LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
 --   LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
@@ -59,7 +59,7 @@ SELECT
   MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_anterior,
   MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_atual,
   MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
-  MAX(CASE WHEN rc.rn = 2 THEN ic.id END) IS NOT NULL AS tem_anterior
+  COUNT(CASE WHEN rc.rn = 2 THEN ic.id END) > 0 AS tem_anterior
 FROM ranked_contagens rc
 LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
 LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
