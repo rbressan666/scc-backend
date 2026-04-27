@@ -29,7 +29,7 @@
 --   FROM ranked_contagens rc
 --   LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
 --   LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
---   LEFT JOIN produtos p ON p.id = vp.produto_id
+--   LEFT JOIN produtos p ON p.id = vp.id_produto
 --   WHERE rc.rn <= 2
 --   GROUP BY p.id, p.nome, vp.id, vp.nome
 --   ORDER BY p.nome ASC
@@ -63,7 +63,7 @@ SELECT
 FROM ranked_contagens rc
 LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
 LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
-LEFT JOIN produtos p ON p.id = vp.produto_id
+LEFT JOIN produtos p ON p.id = vp.id_produto
 WHERE rc.rn <= 2
 GROUP BY p.id, p.nome, vp.id, vp.nome
 ORDER BY p.nome ASC;
