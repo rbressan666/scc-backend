@@ -268,3 +268,76 @@ export const getTurnoStatistics = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+// Buscar detalhe do turno com comparação de contagens
+export const getTurnoDetailWithComparison = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // 1. Buscar informações do turno
+        const turnoResult = await pool.query(
+            'SELECT * FROM turnos WHERE id = $1',
+            [id]
+        );
+
+        if (turnoResult.rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Turno não encontrado' 
+            });
+        }
+
+        const turno = turnoResult.rows[0];
+
+        // 2. Buscar as duas últimas contagens com saldo
+        const contagens = await pool.query(`
+            WITH ranked_contagens AS (
+              SELECT 
+                c.id,
+                c.turno_id,
+                c.inicio_em,
+                c.tipo_contagem,
+                c.status,
+                ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.inicio_em DESC) AS rn
+              FROM contagens c
+              WHERE c.turno_id = $1
+                AND c.status IN ('pre_fechada', 'fechada', 'aberta')
+            )
+            SELECT 
+              p.id AS produto_id,
+              p.nome AS produto_nome,
+              vp.id AS variacao_id,
+              vp.nome AS variacao_nome,
+              MAX(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END) AS contagem_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END) AS contagem_atual,
+              (MAX(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END) - 
+               MAX(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END)) AS saldo,
+              MAX(CASE WHEN rc.rn = 2 THEN rc.inicio_em END) AS data_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.inicio_em END) AS data_atual,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
+              MAX(CASE WHEN rc.rn = 2 THEN ic.id END) IS NOT NULL AS tem_anterior
+            FROM ranked_contagens rc
+            LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
+            LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
+            LEFT JOIN produtos p ON p.id = vp.produto_id
+            WHERE rc.rn <= 2
+            GROUP BY p.id, p.nome, vp.id, vp.nome
+            ORDER BY p.nome ASC
+        `, [id]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                turno,
+                comparacao: contagens.rows
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao buscar detalhe do turno:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erro interno do servidor',
+            error: error.message 
+        });
+    }
+};

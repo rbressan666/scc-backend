@@ -9,7 +9,8 @@ import {
     getTurnoStatistics,
     joinTurno,
     listTurnoParticipants,
-    leaveTurno
+    leaveTurno,
+    getTurnoDetailWithComparison
 } from '../controllers/turnoController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { getChecklist, lockPergunta, unlockPergunta, responderPergunta } from '../controllers/checklistController.js';
@@ -28,6 +29,9 @@ router.route('/:id')
     .put(authenticateToken, closeTurno);
 
 router.route('/:id/reopen').put(authenticateToken, requireAdmin, reopenTurno);
+
+// Detalhe do turno com comparação de contagens
+router.route('/:id/detalhe').get(authenticateToken, getTurnoDetailWithComparison);
 
 // Participação em turno
 router.route('/:id/join').post(authenticateToken, joinTurno);
