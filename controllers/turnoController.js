@@ -278,8 +278,8 @@ export const getTurnoDetailWithComparison = async (req, res) => {
         const turnoResult = await pool.query(
             `SELECT 
                 t.*,
-                u_abertura.nome as usuario_abertura_nome,
-                u_fechamento.nome as usuario_fechamento_nome
+                u_abertura.nome_completo as usuario_abertura_nome,
+                u_fechamento.nome_completo as usuario_fechamento_nome
              FROM turnos t
              LEFT JOIN usuarios u_abertura ON t.usuario_abertura = u_abertura.id
              LEFT JOIN usuarios u_fechamento ON t.usuario_fechamento = u_fechamento.id
@@ -298,7 +298,19 @@ export const getTurnoDetailWithComparison = async (req, res) => {
 
         // 2. Buscar as contagens atuais do turno
         const contagens = await pool.query(`
-            SELECT 
+            WITH ranked_contagens AS (
+              SELECT
+                c.id,
+                c.turno_id,
+                c.data_inicio,
+                c.tipo_contagem,
+                c.status,
+                ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.data_inicio DESC) AS rn
+              FROM contagens c
+              WHERE c.turno_id = $1
+                AND c.status IN ('pre_fechada', 'fechada', 'aberta')
+            )
+            SELECT
               p.id AS produto_id,
               p.nome AS produto_nome,
               vp.id AS variacao_id,
@@ -306,12 +318,11 @@ export const getTurnoDetailWithComparison = async (req, res) => {
               COALESCE(SUM(ic.quantidade_convertida), 0) AS contagem_atual,
               MAX(rc.data_inicio) AS data_atual,
               MAX(rc.status) AS status_contagem_atual
-            FROM contagens rc
+            FROM ranked_contagens rc
             LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
             LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
             LEFT JOIN produtos p ON p.id = vp.id_produto
-            WHERE rc.turno_id = $1
-              AND rc.status IN ('pre_fechada', 'fechada', 'aberta')
+            WHERE rc.rn = 1
             GROUP BY p.id, p.nome, vp.id, vp.nome
             ORDER BY p.nome ASC
         `, [id]);
