@@ -296,8 +296,23 @@ export const getTurnoDetailWithComparison = async (req, res) => {
 
         const turno = turnoResult.rows[0];
 
-        // 2. Buscar as contagens atuais e anteriores do turno
-        const contagens = await pool.query(`
+        // 2. Buscar as duas últimas contagens do sistema, independentemente do turno
+        const latestContagensResult = await pool.query(`
+            SELECT
+                c.id,
+                c.turno_id,
+                c.tipo_contagem,
+                c.status,
+                c.data_inicio
+            FROM contagens c
+            WHERE c.status IN ('em_andamento', 'pre_fechada', 'fechada', 'reaberta')
+            ORDER BY c.data_inicio DESC
+            LIMIT 2
+        `);
+
+        const latestContagemIds = latestContagensResult.rows.map((row) => row.id);
+
+        const comparacaoResult = await pool.query(`
             WITH ranked_contagens AS (
               SELECT
                 c.id,
@@ -305,10 +320,9 @@ export const getTurnoDetailWithComparison = async (req, res) => {
                 c.data_inicio,
                 c.tipo_contagem,
                 c.status,
-                ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.data_inicio DESC) AS rn
+                ROW_NUMBER() OVER (ORDER BY c.data_inicio DESC) AS rn
               FROM contagens c
-              WHERE c.turno_id = $1
-                AND c.status IN ('em_andamento', 'pre_fechada', 'fechada', 'reaberta')
+              WHERE c.id = ANY($1)
             )
             SELECT
               p.id AS produto_id,
@@ -320,7 +334,9 @@ export const getTurnoDetailWithComparison = async (req, res) => {
               MAX(CASE WHEN rc.rn = 1 THEN rc.tipo_contagem END) AS tipo_contagem_atual,
               MAX(CASE WHEN rc.rn = 2 THEN rc.tipo_contagem END) AS tipo_contagem_anterior,
               MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.status END) AS status_contagem_anterior
+              MAX(CASE WHEN rc.rn = 2 THEN rc.status END) AS status_contagem_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_inicio_atual,
+              MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_inicio_anterior
             FROM ranked_contagens rc
             LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
             LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
@@ -328,13 +344,14 @@ export const getTurnoDetailWithComparison = async (req, res) => {
             WHERE rc.rn IN (1, 2)
             GROUP BY p.id, p.nome, vp.id, vp.nome
             ORDER BY p.nome ASC, vp.nome ASC
-        `, [id]);
+        `, [latestContagemIds]);
 
         res.status(200).json({
             success: true,
             data: {
                 turno,
-                comparacao: contagens.rows
+                comparacao: comparacaoResult.rows,
+                contagens: latestContagensResult.rows
             }
         });
     } catch (error) {
