@@ -296,7 +296,7 @@ export const getTurnoDetailWithComparison = async (req, res) => {
 
         const turno = turnoResult.rows[0];
 
-        // 2. Buscar as contagens atuais do turno
+        // 2. Buscar as contagens atuais e anteriores do turno
         const contagens = await pool.query(`
             WITH ranked_contagens AS (
               SELECT
@@ -308,23 +308,26 @@ export const getTurnoDetailWithComparison = async (req, res) => {
                 ROW_NUMBER() OVER (PARTITION BY c.turno_id ORDER BY c.data_inicio DESC) AS rn
               FROM contagens c
               WHERE c.turno_id = $1
-                AND c.status IN ('pre_fechada', 'fechada', 'aberta')
+                AND c.status IN ('em_andamento', 'pre_fechada', 'fechada', 'reaberta')
             )
             SELECT
               p.id AS produto_id,
               p.nome AS produto_nome,
               vp.id AS variacao_id,
               vp.nome AS variacao_nome,
-              COALESCE(SUM(ic.quantidade_convertida), 0) AS contagem_atual,
-              MAX(rc.data_inicio) AS data_atual,
-              MAX(rc.status) AS status_contagem_atual
+              COALESCE(SUM(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_atual,
+              COALESCE(SUM(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.tipo_contagem END) AS tipo_contagem_atual,
+              MAX(CASE WHEN rc.rn = 2 THEN rc.tipo_contagem END) AS tipo_contagem_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
+              MAX(CASE WHEN rc.rn = 2 THEN rc.status END) AS status_contagem_anterior
             FROM ranked_contagens rc
             LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
             LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
             LEFT JOIN produtos p ON p.id = vp.id_produto
-            WHERE rc.rn = 1
+            WHERE rc.rn IN (1, 2)
             GROUP BY p.id, p.nome, vp.id, vp.nome
-            ORDER BY p.nome ASC
+            ORDER BY p.nome ASC, vp.nome ASC
         `, [id]);
 
         res.status(200).json({
