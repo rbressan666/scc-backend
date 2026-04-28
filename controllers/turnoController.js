@@ -340,14 +340,14 @@ export const getTurnoDetailWithComparison = async (req, res) => {
               av.variacao_nome,
               COALESCE(SUM(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_atual,
               COALESCE(SUM(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_anterior,
-              COALESCE(MAX(CASE WHEN rc.rn = 1 THEN ic.id END), NULL) AS item_contagem_id_atual,
+              (ARRAY_AGG(ic.id) FILTER (WHERE rc.rn = 1))[1] AS item_contagem_id_atual,
               MAX(CASE WHEN rc.rn = 1 THEN rc.tipo_contagem END) AS tipo_contagem_atual,
               MAX(CASE WHEN rc.rn = 2 THEN rc.tipo_contagem END) AS tipo_contagem_anterior,
               MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
               MAX(CASE WHEN rc.rn = 2 THEN rc.status END) AS status_contagem_anterior,
               MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_inicio_atual,
               MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_inicio_anterior,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.id END) AS contagem_id_atual
+              (ARRAY_AGG(rc.id) FILTER (WHERE rc.rn = 1))[1] AS contagem_id_atual
             FROM all_variacoes av
             LEFT JOIN ranked_contagens rc ON rc.rn IN (1, 2)
             LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id AND ic.variacao_id = av.variacao_id
