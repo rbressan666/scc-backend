@@ -10,7 +10,10 @@ import {
     joinTurno,
     listTurnoParticipants,
     leaveTurno,
-    getTurnoDetailWithComparison
+    getTurnoDetailWithComparison,
+    saveContagemItem,
+    finalizarContagem,
+    iniciarNovaContagem
 } from '../controllers/turnoController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { getChecklist, lockPergunta, unlockPergunta, responderPergunta } from '../controllers/checklistController.js';
@@ -32,6 +35,11 @@ router.route('/:id/reopen').put(authenticateToken, requireAdmin, reopenTurno);
 
 // Detalhe do turno com comparação de contagens
 router.route('/:id/detalhe').get(authenticateToken, getTurnoDetailWithComparison);
+
+// Gerenciar contagens
+router.route('/contagem/item').post(authenticateToken, saveContagemItem);
+router.route('/contagem/finalizar').post(authenticateToken, finalizarContagem);
+router.route('/contagem/nova').post(authenticateToken, iniciarNovaContagem);
 
 // Participação em turno
 router.route('/:id/join').post(authenticateToken, joinTurno);

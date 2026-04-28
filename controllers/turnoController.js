@@ -323,27 +323,36 @@ export const getTurnoDetailWithComparison = async (req, res) => {
                 ROW_NUMBER() OVER (ORDER BY c.data_inicio DESC) AS rn
               FROM contagens c
               WHERE c.id = ANY($1)
+            ),
+            all_variacoes AS (
+              SELECT DISTINCT
+                p.id AS produto_id,
+                p.nome AS produto_nome,
+                vp.id AS variacao_id,
+                vp.nome AS variacao_nome
+              FROM variacoes_produto vp
+              JOIN produtos p ON p.id = vp.id_produto
             )
             SELECT
-              p.id AS produto_id,
-              p.nome AS produto_nome,
-              vp.id AS variacao_id,
-              vp.nome AS variacao_nome,
+              av.produto_id,
+              av.produto_nome,
+              av.variacao_id,
+              av.variacao_nome,
               COALESCE(SUM(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_atual,
               COALESCE(SUM(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_anterior,
+              COALESCE(MAX(CASE WHEN rc.rn = 1 THEN ic.id END), NULL) AS item_contagem_id_atual,
               MAX(CASE WHEN rc.rn = 1 THEN rc.tipo_contagem END) AS tipo_contagem_atual,
               MAX(CASE WHEN rc.rn = 2 THEN rc.tipo_contagem END) AS tipo_contagem_anterior,
               MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
               MAX(CASE WHEN rc.rn = 2 THEN rc.status END) AS status_contagem_anterior,
               MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_inicio_atual,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_inicio_anterior
-            FROM ranked_contagens rc
-            LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id
-            LEFT JOIN variacoes_produto vp ON vp.id = ic.variacao_id
-            LEFT JOIN produtos p ON p.id = vp.id_produto
-            WHERE rc.rn IN (1, 2)
-            GROUP BY p.id, p.nome, vp.id, vp.nome
-            ORDER BY p.nome ASC, vp.nome ASC
+              MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_inicio_anterior,
+              MAX(CASE WHEN rc.rn = 1 THEN rc.id END) AS contagem_id_atual
+            FROM all_variacoes av
+            LEFT JOIN ranked_contagens rc ON rc.rn IN (1, 2)
+            LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id AND ic.variacao_id = av.variacao_id
+            GROUP BY av.produto_id, av.produto_nome, av.variacao_id, av.variacao_nome
+            ORDER BY av.produto_nome ASC, av.variacao_nome ASC
         `, [latestContagemIds]);
 
         res.status(200).json({
@@ -359,6 +368,117 @@ export const getTurnoDetailWithComparison = async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Erro interno do servidor',
+            error: error.message 
+        });
+    }
+};
+
+// Salvar ou criar item de contagem
+export const saveContagemItem = async (req, res) => {
+    const { contagemId, variacaoId, quantidade, unidadeMedidaId, observacoes } = req.body;
+    const usuarioContador = req.user.id;
+
+    try {
+        if (!contagemId || !variacaoId || quantidade === undefined || !unidadeMedidaId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Campos obrigatórios faltando' 
+            });
+        }
+
+        // Verificar se já existe item para essa variação nesta contagem
+        const existingItem = await pool.query(
+            'SELECT id FROM itens_contagem WHERE contagem_id = $1 AND variacao_id = $2',
+            [contagemId, variacaoId]
+        );
+
+        let result;
+        if (existingItem.rows.length > 0) {
+            // Atualizar
+            result = await pool.query(
+                'UPDATE itens_contagem SET quantidade_contada = $1, quantidade_convertida = $1, unidade_medida_id = $2, observacoes = $3 WHERE contagem_id = $4 AND variacao_id = $5 RETURNING *',
+                [quantidade, unidadeMedidaId, observacoes, contagemId, variacaoId]
+            );
+        } else {
+            // Criar novo
+            result = await pool.query(
+                'INSERT INTO itens_contagem (contagem_id, variacao_id, quantidade_contada, quantidade_convertida, unidade_medida_id, usuario_contador, observacoes) VALUES ($1, $2, $3, $3, $4, $5, $6) RETURNING *',
+                [contagemId, variacaoId, quantidade, unidadeMedidaId, usuarioContador, observacoes]
+            );
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            data: result.rows[0] 
+        });
+    } catch (error) {
+        console.error('Erro ao salvar item de contagem:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erro ao salvar item de contagem',
+            error: error.message 
+        });
+    }
+};
+
+// Finalizar contagem atual
+export const finalizarContagem = async (req, res) => {
+    const { contagemId } = req.body;
+
+    try {
+        if (!contagemId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Contagem ID é obrigatório' 
+            });
+        }
+
+        const result = await pool.query(
+            'UPDATE contagens SET status = $1, data_conclusao = NOW() WHERE id = $2 RETURNING *',
+            ['pre_fechada', contagemId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Contagem não encontrada' 
+            });
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            data: result.rows[0] 
+        });
+    } catch (error) {
+        console.error('Erro ao finalizar contagem:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erro ao finalizar contagem',
+            error: error.message 
+        });
+    }
+};
+
+// Iniciar nova contagem
+export const iniciarNovaContagem = async (req, res) => {
+    const usuarioResponsavel = req.user.id;
+
+    try {
+        // Criar nova contagem com status em_andamento
+        const result = await pool.query(
+            'INSERT INTO contagens (tipo_contagem, status, usuario_responsavel) VALUES ($1, $2, $3) RETURNING *',
+            ['inicial', 'em_andamento', usuarioResponsavel]
+        );
+
+        res.status(201).json({ 
+            success: true, 
+            data: result.rows[0] 
+        });
+    } catch (error) {
+        console.error('Erro ao iniciar nova contagem:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erro ao iniciar nova contagem',
             error: error.message 
         });
     }
