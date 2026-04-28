@@ -6,8 +6,15 @@ import { handleValidationErrors } from '../middleware/validators.js';
 
 const router = express.Router();
 
-// Todas as rotas requerem autenticação de admin
 router.use(authenticateToken);
+
+// GET /api/conversoes/por-variacao/:id - Buscar fatores por variação
+router.get('/por-variacao/:id', handleValidationErrors, FatorConversaoController.getByVariacao);
+
+// POST /api/conversoes/por-variacao/:id/convert - Converter quantidade para outra unidade
+router.post('/por-variacao/:id/convert', handleValidationErrors, FatorConversaoController.convertQuantity);
+
+// Rotas de administração abaixo
 router.use(requireAdmin);
 
 // POST /api/conversoes - Criar novo fator de conversão
@@ -15,9 +22,6 @@ router.post('/', handleValidationErrors, FatorConversaoController.create);
 
 // POST /api/conversoes/multiplos - Criar múltiplos fatores de conversão
 router.post('/multiplos', handleValidationErrors, FatorConversaoController.createMultiple);
-
-// GET /api/conversoes/por-variacao/:id - Buscar fatores por variação
-router.get('/por-variacao/:id', handleValidationErrors, FatorConversaoController.getByVariacao);
 
 // PUT /api/conversoes/:id - Atualizar fator de conversão
 router.put('/:id', handleValidationErrors, FatorConversaoController.update);

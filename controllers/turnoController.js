@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
 import { enqueueNotification } from '../services/notificationsService.js';
+import FatorConversao from '../models/FatorConversao.js';
 
 export const createTurno = async (req, res) => {
     try {
@@ -324,35 +325,91 @@ export const getTurnoDetailWithComparison = async (req, res) => {
               FROM contagens c
               WHERE c.id = ANY($1)
             ),
-            all_variacoes AS (
-              SELECT DISTINCT
+            variation_counts AS (
+              SELECT
+                vp.id AS variacao_id,
+                vp.id_produto AS produto_id,
+                vp.nome AS variacao_nome,
+                vp.id_unidade_controle,
+                um.nome AS unidade_nome,
+                um.sigla AS unidade_sigla,
+                COALESCE(SUM(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_atual,
+                COALESCE(SUM(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_anterior,
+                (ARRAY_AGG(ic.id) FILTER (WHERE rc.rn = 1))[1] AS item_contagem_id_atual,
+                (ARRAY_AGG(ic.id) FILTER (WHERE rc.rn = 2))[1] AS item_contagem_id_anterior
+              FROM variacoes_produto vp
+              LEFT JOIN unidades_de_medida um ON vp.id_unidade_controle = um.id
+              LEFT JOIN itens_contagem ic ON ic.variacao_id = vp.id
+              LEFT JOIN ranked_contagens rc ON rc.id = ic.contagem_id
+              WHERE vp.ativo = true
+              GROUP BY vp.id, vp.id_produto, vp.nome, vp.id_unidade_controle, um.nome, um.sigla
+            ),
+            produto_meta AS (
+              SELECT DISTINCT ON (p.id)
                 p.id AS produto_id,
                 p.nome AS produto_nome,
-                vp.id AS variacao_id,
-                vp.nome AS variacao_nome
-              FROM variacoes_produto vp
-              JOIN produtos p ON p.id = vp.id_produto
+                p.id_categoria AS categoria_id,
+                c.nome AS categoria_nome,
+                p.id_setor AS setor_id,
+                s.nome AS setor_nome,
+                vp.id AS variacao_principal_id,
+                vp.nome AS variacao_principal_nome,
+                vp.id_unidade_controle AS unidade_principal_id,
+                um.nome AS unidade_principal_nome,
+                um.sigla AS unidade_principal_sigla
+              FROM produtos p
+              LEFT JOIN categorias c ON p.id_categoria = c.id
+              LEFT JOIN setores s ON p.id_setor = s.id
+              LEFT JOIN variacoes_produto vp ON vp.id_produto = p.id AND vp.ativo = true
+              LEFT JOIN unidades_de_medida um ON vp.id_unidade_controle = um.id
+              ORDER BY p.id, vp.fator_prioridade ASC NULLS LAST, vp.nome ASC
+            ),
+            product_totals AS (
+              SELECT
+                vc.produto_id,
+                COALESCE(SUM(vc.contagem_atual), 0) AS contagem_atual,
+                COALESCE(SUM(vc.contagem_anterior), 0) AS contagem_anterior
+              FROM variation_counts vc
+              GROUP BY vc.produto_id
+            ),
+            product_variations AS (
+              SELECT
+                produto_id,
+                json_agg(
+                  json_build_object(
+                    'variacao_id', variacao_id,
+                    'variacao_nome', variacao_nome,
+                    'id_unidade_controle', id_unidade_controle,
+                    'unidade_nome', unidade_nome,
+                    'unidade_sigla', unidade_sigla,
+                    'contagem_atual', contagem_atual,
+                    'contagem_anterior', contagem_anterior,
+                    'item_contagem_id_atual', item_contagem_id_atual,
+                    'item_contagem_id_anterior', item_contagem_id_anterior
+                  ) ORDER BY variacao_nome
+                ) AS variacoes
+              FROM variation_counts
+              GROUP BY produto_id
             )
             SELECT
-              av.produto_id,
-              av.produto_nome,
-              av.variacao_id,
-              av.variacao_nome,
-              COALESCE(SUM(CASE WHEN rc.rn = 1 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_atual,
-              COALESCE(SUM(CASE WHEN rc.rn = 2 THEN ic.quantidade_convertida ELSE 0 END), 0) AS contagem_anterior,
-              (ARRAY_AGG(ic.id) FILTER (WHERE rc.rn = 1))[1] AS item_contagem_id_atual,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.tipo_contagem END) AS tipo_contagem_atual,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.tipo_contagem END) AS tipo_contagem_anterior,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.status END) AS status_contagem_atual,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.status END) AS status_contagem_anterior,
-              MAX(CASE WHEN rc.rn = 1 THEN rc.data_inicio END) AS data_inicio_atual,
-              MAX(CASE WHEN rc.rn = 2 THEN rc.data_inicio END) AS data_inicio_anterior,
-              (ARRAY_AGG(rc.id) FILTER (WHERE rc.rn = 1))[1] AS contagem_id_atual
-            FROM all_variacoes av
-            LEFT JOIN ranked_contagens rc ON rc.rn IN (1, 2)
-            LEFT JOIN itens_contagem ic ON ic.contagem_id = rc.id AND ic.variacao_id = av.variacao_id
-            GROUP BY av.produto_id, av.produto_nome, av.variacao_id, av.variacao_nome
-            ORDER BY av.produto_nome ASC, av.variacao_nome ASC
+              pm.produto_id,
+              pm.produto_nome,
+              pm.categoria_id,
+              pm.categoria_nome,
+              pm.setor_id,
+              pm.setor_nome,
+              pm.variacao_principal_id,
+              pm.variacao_principal_nome,
+              pm.unidade_principal_id,
+              pm.unidade_principal_nome,
+              pm.unidade_principal_sigla,
+              COALESCE(pt.contagem_atual, 0) AS contagem_atual,
+              COALESCE(pt.contagem_anterior, 0) AS contagem_anterior,
+              COALESCE(pv.variacoes, '[]'::json) AS variacoes
+            FROM produto_meta pm
+            LEFT JOIN product_totals pt ON pt.produto_id = pm.produto_id
+            LEFT JOIN product_variations pv ON pv.produto_id = pm.produto_id
+            ORDER BY pm.produto_nome ASC
         `, [latestContagemIds]);
 
         res.status(200).json({
@@ -386,6 +443,39 @@ export const saveContagemItem = async (req, res) => {
             });
         }
 
+        const variacaoResult = await pool.query(
+            'SELECT id_unidade_controle FROM variacoes_produto WHERE id = $1',
+            [variacaoId]
+        );
+
+        if (variacaoResult.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Variação não encontrada' });
+        }
+
+        const unidadeControleId = variacaoResult.rows[0].id_unidade_controle;
+        let quantidadeConvertida = parseFloat(quantidade);
+
+        if (isNaN(quantidadeConvertida) || quantidadeConvertida < 0) {
+            return res.status(400).json({ success: false, message: 'Quantidade inválida' });
+        }
+
+        if (unidadeMedidaId !== unidadeControleId) {
+            try {
+                const conversion = await FatorConversao.convertQuantity(
+                    variacaoId,
+                    quantidadeConvertida,
+                    unidadeMedidaId,
+                    unidadeControleId
+                );
+                quantidadeConvertida = parseFloat(conversion);
+            } catch (conversionError) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Não foi possível converter a quantidade para a unidade principal: ${conversionError.message}`
+                });
+            }
+        }
+
         // Verificar se já existe item para essa variação nesta contagem
         const existingItem = await pool.query(
             'SELECT id FROM itens_contagem WHERE contagem_id = $1 AND variacao_id = $2',
@@ -396,14 +486,14 @@ export const saveContagemItem = async (req, res) => {
         if (existingItem.rows.length > 0) {
             // Atualizar
             result = await pool.query(
-                'UPDATE itens_contagem SET quantidade_contada = $1, quantidade_convertida = $1, unidade_medida_id = $2, observacoes = $3 WHERE contagem_id = $4 AND variacao_id = $5 RETURNING *',
-                [quantidade, unidadeMedidaId, observacoes, contagemId, variacaoId]
+                'UPDATE itens_contagem SET quantidade_contada = $1, quantidade_convertida = $2, unidade_medida_id = $3, observacoes = $4 WHERE contagem_id = $5 AND variacao_id = $6 RETURNING *',
+                [quantidade, quantidadeConvertida, unidadeMedidaId, observacoes, contagemId, variacaoId]
             );
         } else {
             // Criar novo
             result = await pool.query(
-                'INSERT INTO itens_contagem (contagem_id, variacao_id, quantidade_contada, quantidade_convertida, unidade_medida_id, usuario_contador, observacoes) VALUES ($1, $2, $3, $3, $4, $5, $6) RETURNING *',
-                [contagemId, variacaoId, quantidade, unidadeMedidaId, usuarioContador, observacoes]
+                'INSERT INTO itens_contagem (contagem_id, variacao_id, quantidade_contada, quantidade_convertida, unidade_medida_id, usuario_contador, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+                [contagemId, variacaoId, quantidade, quantidadeConvertida, unidadeMedidaId, usuarioContador, observacoes]
             );
         }
 
