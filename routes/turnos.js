@@ -13,7 +13,8 @@ import {
     getTurnoDetailWithComparison,
     saveContagemItem,
     finalizarContagem,
-    iniciarNovaContagem
+    iniciarNovaContagem,
+    closeContagemAndStartFinal
 } from '../controllers/turnoController.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { getChecklist, lockPergunta, unlockPergunta, responderPergunta } from '../controllers/checklistController.js';
@@ -40,6 +41,7 @@ router.route('/:id/detalhe').get(authenticateToken, getTurnoDetailWithComparison
 router.route('/contagem/item').post(authenticateToken, saveContagemItem);
 router.route('/contagem/finalizar').post(authenticateToken, finalizarContagem);
 router.route('/contagem/nova').post(authenticateToken, iniciarNovaContagem);
+router.route('/contagem/fechar-inicial-iniciar-final').post(authenticateToken, closeContagemAndStartFinal);
 
 // Participação em turno
 router.route('/:id/join').post(authenticateToken, joinTurno);

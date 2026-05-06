@@ -20,6 +20,20 @@ export const createTurno = async (req, res) => {
             });
         }
 
+        // Fechar contagens abertas de turnos anteriores (status != 'fechada')
+        try {
+            await pool.query(
+                `UPDATE contagens 
+                 SET status = $1 
+                 WHERE status IN ($2, $3, $4) AND turno_id IN (
+                     SELECT id FROM turnos WHERE status = $5
+                 )`,
+                ['fechada', 'em_andamento', 'pre_fechada', 'reaberta', 'fechado']
+            );
+        } catch (e) {
+            console.error('Erro ao fechar contagens abertas:', e);
+        }
+
         // Usar valores padrão se não fornecidos
         const dataAtual = new Date();
         const dataTurno = data_turno || dataAtual.toISOString().split('T')[0];
@@ -27,10 +41,25 @@ export const createTurno = async (req, res) => {
         const horarioInicio = horario_inicio || dataAtual.toISOString();
         const observacoes = observacoes_abertura || 'Turno criado pelo sistema';
 
+        // Criar novo turno e contagem inicial
         const newTurno = await pool.query(
             'INSERT INTO turnos (data_turno, tipo_turno, horario_inicio, usuario_abertura, observacoes_abertura, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
             [dataTurno, tipoTurno, horarioInicio, usuario_abertura, observacoes, 'aberto']
         );
+
+        // Criar contagem inicial para o novo turno
+        const turnoId = newTurno.rows[0].id;
+        try {
+            await pool.query(
+                `INSERT INTO contagens (turno_id, tipo_contagem, status, data_inicio)
+                 VALUES ($1, $2, $3, $4)`,
+                [turnoId, 'inicial', 'em_andamento', new Date().toISOString()]
+            );
+        } catch (e) {
+            console.error('Erro ao criar contagem inicial:', e);
+        }
+
+        const newTurnoData = newTurno.rows[0];
         
         // Notificar administradores (e o usuário que abriu) sobre abertura de turno (simplificado)
         try {
@@ -111,6 +140,18 @@ export const closeTurno = async (req, res) => {
     const usuario_fechamento = req.user.id;
 
     try {
+        // Finalizar contagem em_andamento do turno
+        try {
+            await pool.query(
+                `UPDATE contagens 
+                 SET status = $1 
+                 WHERE turno_id = $2 AND status = $3`,
+                ['fechada', id, 'em_andamento']
+            );
+        } catch (e) {
+            console.error('Erro ao finalizar contagem:', e);
+        }
+
         const updatedTurno = await pool.query(
             'UPDATE turnos SET status = $1, horario_fim = $2, usuario_fechamento = $3, observacoes_fechamento = $4 WHERE id = $5 RETURNING *',
             ['fechado', new Date(), usuario_fechamento, observacoes_fechamento, id]
@@ -150,6 +191,62 @@ export const closeTurno = async (req, res) => {
             success: false,
             message: 'Erro ao fechar turno',
             error: error.message 
+        });
+    }
+};
+
+// Fecha contagem inicial e cria contagem final
+export const closeContagemAndStartFinal = async (req, res) => {
+    try {
+        const turnoAberto = await pool.query(
+            'SELECT id FROM turnos WHERE status = $1',
+            ['aberto']
+        );
+
+        if (turnoAberto.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nenhum turno aberto encontrado'
+            });
+        }
+
+        const turnoId = turnoAberto.rows[0].id;
+
+        // Fechar contagem inicial
+        const closeResult = await pool.query(
+            `UPDATE contagens 
+             SET status = $1 
+             WHERE turno_id = $2 AND tipo_contagem = $3 AND status = $4
+             RETURNING id`,
+            ['fechada', turnoId, 'inicial', 'em_andamento']
+        );
+
+        if (closeResult.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nenhuma contagem inicial em andamento encontrada'
+            });
+        }
+
+        // Criar contagem final
+        const createResult = await pool.query(
+            `INSERT INTO contagens (turno_id, tipo_contagem, status, data_inicio)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [turnoId, 'final', 'em_andamento', new Date().toISOString()]
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Contagem inicial finalizada e contagem final iniciada',
+            data: createResult.rows[0]
+        });
+    } catch (error) {
+        console.error('Erro ao fechar contagem inicial e criar final:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erro ao fechar contagem inicial e criar final',
+            error: error.message
         });
     }
 };
